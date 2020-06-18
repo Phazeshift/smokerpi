@@ -7,6 +7,7 @@
   "private": false,
   "dependencies": {
     "bootstrap": "^4.5.0",
+    "bootswatch": "^4.5.0",
     "create-react-app": "^3.4.1",
     "react": "^16.13.1",
     "react-bootstrap": "^1.0.1",

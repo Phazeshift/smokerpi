@@ -2,9 +2,10 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import * as actions from './actions/actions';
 import MyNavBar from './NavBar';
-import 'bootstrap/dist/css/bootstrap.min.css';
+/* import 'bootstrap/dist/css/bootstrap.min.css'; */
+import "bootswatch/dist/flatly/bootstrap.min.css"; 
 import './App.css';
-import { Container,Button, Row, Col, Jumbotron } from 'react-bootstrap';
+import { Container,Button, Row, Col, Card, CardDeck } from 'react-bootstrap';
 
 
 class App extends Component {
@@ -20,26 +21,29 @@ class App extends Component {
       <Container fluid>
       {/* <div className="App-logo"> 
         <img src={fire} alt="Logo" />
-    </div> */}    
-      <Jumbotron>
-        <Row>
-           <Col className='d-flex justify-content-center'>
-             <h1>{this.props.smoker.temperature}°C</h1>      
-           </Col>
-        </Row>        
-      </Jumbotron>
-      <Row className='d-flex align-items-end'>
-      <Col xs='1'></Col>
-      <Col >
-        <small>Blower: {this.props.smoker.blower}</small>
-      </Col>
-      </Row>
+    </div> */}   
+    <CardDeck>
+      <Card bg='light' style={{ width: '150rem' }}>
+        <Card.Body className='d-flex justify-content-center'>
+        <h1>{this.props.smoker.temperature}°C</h1> 
+        </Card.Body>
+        <Card.Footer className="text-muted">
+          <small>Blower: {this.props.smoker.blower}</small>
+        </Card.Footer>
+      </Card> 
+      </CardDeck>
+      <CardDeck>
+      <Card>
+      <Card.Body>
       <Row>
         <Col className='d-flex justify-content-center'>
             <Button variant="light" onClick={this.props.getState}>Test getState</Button>       
             <Button variant="light" onClick={this.props.toggleBlower}>Test blower</Button>             
         </Col>
-      </Row>  
+      </Row> 
+      </Card.Body> 
+      </Card>
+      </CardDeck>
       <pre className='text-black-50'>
       {
       JSON.stringify(this.props)
