@@ -34,7 +34,8 @@ class Blower:
 
     def setNonPwm(self):
         if (self.pwmMode == True): 
-            p.stop()
+            if hasattr(self, 'p')
+                self.p.stop()
             GPIO.setup(self.pin1, GPIO.OUT) 
             GPIO.setup(self.pin2, GPIO.OUT)        
             self.pwmMode = False  
