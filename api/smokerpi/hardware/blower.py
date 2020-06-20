@@ -28,31 +28,31 @@ class Blower:
             self.on()
 
     def setPwm(self):
-        self.p = GPIO.PWM(self.pin1, 100)          
-        self.p.start(0)
-        self.pwmMode = True
+        if (self.pwmMode != True): 
+            self.p = GPIO.PWM(self.pin1, 100)          
+            self.p.start(0)
+            self.pwmMode = True
 
     def setNonPwm(self):
-        GPIO.setup(self.pin1, GPIO.OUT) 
-        GPIO.setup(self.pin2, GPIO.OUT)        
-        self.pwmMode = False  
+        if (self.pwmMode == True): 
+            p.stop()
+            GPIO.setup(self.pin1, GPIO.OUT) 
+            GPIO.setup(self.pin2, GPIO.OUT)        
+            self.pwmMode = False  
 
     def pwm(self, value):
-        if (self.pwmMode != True): 
-          self.setPwm()        
+        self.setPwm()        
         self.p.ChangeDutyCycle(value)
         self.state = value  
 
-    def on(self):
-        if (self.pwmMode): 
-          self.setNonPwm()   
+    def on(self):        
+        self.setNonPwm()   
         GPIO.output(self.pin1, 1)    
         GPIO.output(self.pin2, 0)     
         self.state = 100  
 
-    def off(self): 
-        if (self.pwmMode): 
-          self.setNonPwm()   
+    def off(self):         
+        self.setNonPwm()   
         GPIO.output(self.pin1, 0)    
         GPIO.output(self.pin2, 0)    
         self.state = 0  
