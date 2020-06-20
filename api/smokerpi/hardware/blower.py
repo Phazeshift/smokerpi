@@ -9,11 +9,10 @@ class Blower:
         self.pin1 = pin1        
         self.pin2 = pin2  
         self.board = board
-        self.pwmMode = False
+        self.pwmMode = True
         self.state = 0
 
-        GPIO.setmode(self.board)            # choose BCM or BOARD    
-        self.setNonPwm()      
+        GPIO.setmode(self.board)            # choose BCM or BOARD               
         self.off()
 
     def cleanup(self):
