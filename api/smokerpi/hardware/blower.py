@@ -12,7 +12,8 @@ class Blower:
         self.pwmMode = False
         self.state = 0
 
-        GPIO.setmode(self.board)            # choose BCM or BOARD          
+        GPIO.setmode(self.board)            # choose BCM or BOARD    
+        self.setNonPwm()      
         self.off()
 
     def cleanup(self):
