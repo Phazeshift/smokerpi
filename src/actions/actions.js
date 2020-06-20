@@ -23,26 +23,27 @@ export const getTime = () => dispatch => {
             })
 }
 
-export const itemAdded = (data) => {
-	return (dispatch) => {		
-	    dispatch({type: DATA_LOADED, data});	
-    }
-}	
-    
-export const socketAction = (socket) => {
-	return (dispatch) => {		
-	    socket.emit('addItem', { value: 'test'});		
-    }
-}	
-    
 export const toggleBlower = () => {
         return (dispatch) => {		
             dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'toggleBlower', payload: {} });		
         }	    
     }   
 
+export const toggleAutomatic = () => {
+        return (dispatch) => {		
+            dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'toggleAutomatic', payload: {} });		
+        }	    
+    }       
+
 export const getState = () => {
     return (dispatch) => {		
         dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'getState', payload: {} });		
+    }
+}	    
+
+export const getAllGraph = () => {
+        return (dispatch) => {		
+            dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'getAllGraph', payload: {} });		
+        }
     }	    
-}   
+   

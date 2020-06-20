@@ -141,6 +141,20 @@ class MAX31855Error(Exception):
      def __str__(self):
          return repr(self.value)
 
+class TestMAX31855(object):
+    def __init__(self, blower):
+        self.currentTemp = 20
+        self.blower = blower
+
+    def get(self):
+        self.currentTemp = self.currentTemp - 2
+        self.currentTemp = round(self.currentTemp + ((self.blower.state / 100) * 5), 2)
+        self.currentTemp = max(self.currentTemp, 20)
+        return self.currentTemp       
+
+    def cleanup(self):
+        pass
+
 if __name__ == "__main__":
 
     # Multi-chip example

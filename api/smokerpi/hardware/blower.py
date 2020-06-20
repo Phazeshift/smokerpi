@@ -5,14 +5,14 @@ except (RuntimeError, ModuleNotFoundError):
     from .RPi import GPIO    
 
 class Blower:    
-    def __init__(self, pin1 = 19, pin2 = 26, board = GPIO.BCM):
+    def __init__(self, pin1, pin2, board = GPIO.BCM):
         self.pin1 = pin1        
         self.pin2 = pin2  
         self.board = board
+        self.pwmMode = False
+        self.state = 0
 
-        GPIO.setmode(self.board)            # choose BCM or BOARD  
-        GPIO.setup(self.pin1, GPIO.OUT) # set a port/pin as an output   
-        GPIO.setup(self.pin2, GPIO.OUT) # set a port/pin as an output   
+        GPIO.setmode(self.board)            # choose BCM or BOARD          
         self.off()
 
     def cleanup(self):
@@ -21,19 +21,40 @@ class Blower:
         GPIO.cleanup() 
 
     def toggleState(self):        
-        if (self.state == True):
+        if (self.state > 0 | self.pwmMode):
             self.off()            
         else:            
             self.on()
 
+    def setPwm(self):
+        self.p = GPIO.PWM(self.pin1, 100)          
+        self.p.start(0)
+        self.pwmMode = True
+
+    def setNonPwm(self):
+        GPIO.setup(self.pin1, GPIO.OUT) 
+        GPIO.setup(self.pin2, GPIO.OUT)        
+        self.pwmMode = False  
+
+    def pwm(self, value):
+        if (self.pwmMode != True): 
+          self.setPwm()        
+        self.p.ChangeDutyCycle(value)
+        self.state = value  
+
     def on(self):
-        GPIO.output(self.pin1, 1)        
-        self.state = True  
+        if (self.pwmMode): 
+          self.setNonPwm()   
+        GPIO.output(self.pin1, 1)    
+        GPIO.output(self.pin2, 0)     
+        self.state = 100  
 
     def off(self): 
+        if (self.pwmMode): 
+          self.setNonPwm()   
         GPIO.output(self.pin1, 0)    
         GPIO.output(self.pin2, 0)    
-        self.state = False  
+        self.state = 0  
 
 if __name__ == "__main__":
     # Example

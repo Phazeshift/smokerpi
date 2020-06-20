@@ -14,8 +14,7 @@ export const socketMiddleware = (url) => {
             });
         });
 
-        return next => action => {
-            console.log(action);
+        return next => action => {            
             if(action.type === "SEND_WEBSOCKET_MESSAGE") {
                 console.log(action);
                 socket.emit(action.method, action.payload);
