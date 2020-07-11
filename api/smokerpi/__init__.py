@@ -7,7 +7,7 @@ from logging.handlers import RotatingFileHandler
 from flask import json
 from werkzeug.exceptions import InternalServerError
 from .hardware.blower import Blower
-from .hardware.max31855 import MAX31855, TestMAX31855
+from .hardware.max31855 import MAX31855, TestMAX31855, MAX31855Error
 from simple_pid import PID
 from datetime import datetime
 import array
@@ -96,7 +96,10 @@ def switchAutomatic(data):
 
 def monitorTemp():
     while app.smokerpi_running:
-        app.smokerpi_currentTemperature = app.smokerpi_max31855.get()
+        try:
+            app.smokerpi_currentTemperature = app.smokerpi_max31855.get()
+        except (MAX31855Error):
+            app.smokerpi_currentTemperature = -1
         app.smokerpi_currentBlowerState = app.smokerpi_blower.state
         app.smokerpi_graphData.append({ 'i': app.smokerpi_graphIndex, 'x': datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 't': app.smokerpi_currentTemperature, 'b': app.smokerpi_blower.state, 's': app.smokerpi_setTemperature })
         while (len(app.smokerpi_graphData) > 2000):
