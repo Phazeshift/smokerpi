@@ -41,9 +41,21 @@ export const getState = () => {
     }
 }	    
 
+export const getConfig = () => {
+    return (dispatch) => {		
+        dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'getConfig', payload: {} });		
+    }
+}	   
+
+export const updateConfig = (config) => {
+    return (dispatch) => {		
+        dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'updateConfig', payload: { ...config } });		
+    }
+}	 
+
 export const getAllGraph = () => {
         return (dispatch) => {		
             dispatch({ type: SEND_WEBSOCKET_MESSAGE, method: 'getAllGraph', payload: {} });		
         }
-    }	    
+}	   
    

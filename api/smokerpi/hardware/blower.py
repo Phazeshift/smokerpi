@@ -16,9 +16,9 @@ class Blower:
         self.off()
 
     def cleanup(self):
-        GPIO.output(self.pin1, 0)
-        GPIO.output(self.pin2, 0)
-        GPIO.cleanup() 
+        '''Selective GPIO cleanup'''
+        GPIO.setup(self.pin1, GPIO.IN)
+        GPIO.setup(self.pin2, GPIO.IN)        
 
     def toggleState(self):        
         if (self.state > 0 | self.pwmMode):

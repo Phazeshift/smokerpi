@@ -14,16 +14,15 @@ class Home extends Component {
   }
 
   render() {    
-    return (          
-    <div>      
+    return (                    
       <Container>       
     <CardDeck>
       <Card bg='light'>
         <Card.Body className='d-flex justify-content-center'>
-        <h1>{this.props.smoker.temperature}°C</h1> 
+        <h1>{this.props.smokerpi.temperature}°C</h1> 
         </Card.Body>
         <Card.Footer className="text-muted">
-  <small>Blower: {this.props.smoker.blower} Pid: {this.props.smoker.pid ? 'On' : 'Off'} Target: {this.props.smoker.targetTemperature}</small>
+  <small>Blower: {this.props.smokerpi.blower} Pid: {this.props.smokerpi.pid ? 'On' : 'Off'} Target: {this.props.smokerpi.targetTemperature}</small>
         </Card.Footer>
       </Card> 
       </CardDeck>
@@ -32,11 +31,10 @@ class Home extends Component {
       <Card.Body>
       <Row>
         <Col className='d-flex justify-content-center'>
-          <ButtonGroup>
-            <Button variant="light" className='ml-1' onClick={this.props.getState}>Test getState</Button>       
-            <Button variant="light" className='ml-1' onClick={this.props.toggleBlower}>Test blower</Button>             
-            <Button variant="light" className='ml-1' onClick={this.props.toggleAutomatic}>Test pid</Button>  
-            <Button variant="light" className='ml-1' onClick={this.props.getAllGraph}>Test graph</Button> 
+          <ButtonGroup>                   
+            <Button variant="light" className='ml-1' onClick={this.props.toggleBlower}>Toggle Blower</Button>             
+            <Button variant="light" className='ml-1' onClick={this.props.toggleAutomatic}>Toggle Pid</Button>  
+            <Button variant="light" className='ml-1' onClick={this.props.getAllGraph}>Update Graph</Button> 
           </ButtonGroup>
         </Col>
       </Row> 
@@ -59,7 +57,7 @@ class Home extends Component {
   }}>
       <ResponsiveContainer>
       <LineChart   
-  data={this.props.smoker.graphData}
+  data={this.props.smokerpi.graphData}
   margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
 >
   <XAxis dataKey="x" />  
@@ -76,8 +74,7 @@ class Home extends Component {
 </Card.Body>
       </Card>
       </CardDeck>     
-    </Container>    
-    </div>    
+    </Container>   
   )};
 }
 
