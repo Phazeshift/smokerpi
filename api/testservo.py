@@ -1,10 +1,14 @@
-from pca9685_driver import Device
+import time
+from adafruit_servokit import ServoKit
+ 
+kit = ServoKit(channels=16)
+#kit.servo[0].actuation_range = 120
+#kit.servo[0].set_pulse_width_range(750, 2250)
+kit.servo[0].angle = 120
 
-# 0x40 from i2cdetect -y 1 (1 if Raspberry pi 2)
-dev = Device(0x40)
+time.sleep(1)
 
-# set the duty cycle for LED05 to 50%
-dev.set_pwm(0, 2047)
+kit.servo[0].angle = 0
 
-# set the pwm frequency (Hz)
-dev.set_pwm_frequency(1000)
+time.sleep(1)
+
