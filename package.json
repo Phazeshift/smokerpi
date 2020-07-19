@@ -1,0 +1,66 @@
+{
+  "name": "smokerpi",
+  "version": "0.1.0",
+  "repository": "https://github.com/Phazeshift/smokerpi.git",
+  "author": "Phazeshift",
+  "license": "GPL-3.0-only",
+  "private": false,
+  "dependencies": {
+    "bootstrap": "^4.5.0",
+    "bootswatch": "^4.5.0",
+    "create-react-app": "^3.4.1",
+    "react": "^16.13.1",
+    "react-bootstrap": "^1.0.1",
+    "react-dom": "^16.13.1",
+    "react-redux": "^7.2.0",
+    "react-redux-toastr": "^7.6.5",
+    "react-router": "^5.2.0",
+    "react-router-bootstrap": "^0.25.0",
+    "react-router-dom": "^5.2.0",
+    "react-thunk": "^1.0.0",
+    "recharts": "^1.8.5",
+    "redux": "^4.0.5",
+    "redux-logger": "^3.0.6",
+    "redux-thunk": "^2.3.0",
+    "socket.io-client": "^2.3.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "start-api": "cd api && ./venv/scripts/activate && python runserver.py",
+    "start-api2": "cd api && venv/Scripts/flask run --no-debugger",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "buildwebpack": "webpack --mode production"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "proxy": "http://localhost:5000",
+  "devDependencies": {
+    "@babel/core": "^7.10.2",
+    "@babel/preset-env": "^7.10.2",
+    "@babel/preset-react": "^7.10.1",
+    "@testing-library/jest-dom": "^4.2.4",
+    "@testing-library/react": "^9.3.2",
+    "@testing-library/user-event": "^7.1.2",
+    "babel-loader": "^8.1.0",
+    "css-loader": "^3.6.0",
+    "html-loader": "^1.1.0",
+    "html-webpack-plugin": "^4.3.0",
+    "react-scripts": "3.4.1",
+    "svg-inline-loader": "^0.8.2"
+  }
+}

@@ -1,0 +1,1 @@
+{"cs_pin": 20, "clock_pin": 21, "data_pin": 16, "blower_pin1": 19, "blower_pin2": 26, "set_temperature": 105, "graph_interval": 10, "push_interval": 10, "blower_minimum": 40}
