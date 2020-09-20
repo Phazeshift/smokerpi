@@ -46,16 +46,18 @@ class Blower:
         self.state = value  
 
     def on(self):        
-        self.setNonPwm()   
-        GPIO.output(self.pin1, 1)    
-        GPIO.output(self.pin2, 0)     
-        self.state = 100  
+        if (self.state != 100):
+            self.setNonPwm()   
+            GPIO.output(self.pin1, 1)    
+            GPIO.output(self.pin2, 0)     
+            self.state = 100  
 
     def off(self):         
-        self.setNonPwm()   
-        GPIO.output(self.pin1, 0)    
-        GPIO.output(self.pin2, 0)    
-        self.state = 0  
+        if (self.state != 0):
+            self.setNonPwm()   
+            GPIO.output(self.pin1, 0)    
+            GPIO.output(self.pin2, 0)    
+            self.state = 0  
 
 if __name__ == "__main__":
     # Example

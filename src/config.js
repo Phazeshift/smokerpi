@@ -51,8 +51,7 @@ class Config extends Component {
             );        
         }
         
-        const {
-            submitted,
+        const {            
             errors
           } = this.state;
       return (         
@@ -156,6 +155,39 @@ class Config extends Component {
               onChange={this.handleChange}
               placeholder="Enter value..."
               error={errors.blower_pin2}
+              required
+              className="input"
+            />
+             <FormInput
+              label="Damper pin"
+              name="damper_pin"
+              type="text"
+              value={this.state.config.damper_pin}
+              onChange={this.handleChange}
+              placeholder="Enter value..."
+              error={errors.damper_pin}
+              required
+              className="input"
+            />
+            <FormInput
+              label="Damper min"
+              name="damper_minimum"
+              type="text"
+              value={this.state.config.damper_minimum}
+              onChange={this.handleChange}
+              placeholder="Enter value..."
+              error={errors.damper_minimum}
+              required
+              className="input"
+            />
+            <FormInput
+              label="Damper max"
+              name="damper_maximum"
+              type="text"
+              value={this.state.config.damper_maximum}
+              onChange={this.handleChange}
+              placeholder="Enter value..."
+              error={errors.damper_maximum}
               required
               className="input"
             />

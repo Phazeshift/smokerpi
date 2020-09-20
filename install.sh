@@ -31,24 +31,36 @@ EOF
 chmod +x runserver.sh
 
 #Install pip & Flask
-apt-get -y install python-setuptools python-dev python3-pip
+apt-get -y install python-setuptools python-dev python3-pip pigpio
 
 cd api
-#pip install virtualenv
+pip install virtualenv
 python3 -m venv venv
 source "./venv/bin/activate"
 pip install -r requirements.txt
 cd .. 
 
 while true; do
+    read -p "Would you like to start pigpiod automatically after boot? (required for servo / damper support) (y/n): " yn
+    case $yn in
+        [Yy]* ) systemctl enable pigpiod
+            systemctl start pigpiod 
+        	break;;
+        [Nn]* ) break;;
+        * ) echo "Please select (y/n): ";;
+    esac
+done
+
+while true; do
     read -p "Would you like to start SmokerPi automatically after boot? (y/n): " yn
     case $yn in
         [Yy]* ) sed "s@#DIR#@${PWD}@g" smokerpiboot > /etc/init.d/smokerpiboot
 
-    chmod 755 /etc/init.d/smokerpiboot;
+        chmod 755 /etc/init.d/smokerpiboot;
 		update-rc.d smokerpiboot defaults;
 		break;;
         [Nn]* ) break;;
         * ) echo "Please select (y/n): ";;
     esac
 done
+
