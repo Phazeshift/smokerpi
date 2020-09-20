@@ -9,7 +9,7 @@ import App from './app';
 
 ReactDOM.render(
   <React.StrictMode>
-    <Provider store={configureStore(window.location.href)}>
+    <Provider store={configureStore()}>
 		<App />
 	</Provider>
   </React.StrictMode>,

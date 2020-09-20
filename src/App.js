@@ -2,12 +2,11 @@ import React from 'react';
 import {
     BrowserRouter as Router,
     Switch,
-    Route,
-    Link
+    Route
   } from "react-router-dom";
   import MyNavBar from './NavBar';
-  import Home from './home'
-  import Config from './config'
+  import Home from './home';
+  import Config from './config';
   
   export default function App() {
     return (

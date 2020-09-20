@@ -39,8 +39,7 @@ export const FormInput = ({
       }
       
       FormInput.propTypes = {
-        name: PropTypes.string.isRequired,
-        type: PropTypes.string,
+        name: PropTypes.string.isRequired,        
         placeholder: PropTypes.string.isRequired,
         type: PropTypes.oneOf(['text', 'number', 'password']),
         className: PropTypes.string,

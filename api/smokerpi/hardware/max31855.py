@@ -142,13 +142,13 @@ class MAX31855Error(Exception):
          return repr(self.value)
 
 class TestMAX31855(object):
-    def __init__(self, blower):
+    def __init__(self, pitController):
         self.currentTemp = 20
-        self.blower = blower
+        self.pitController = pitController
 
     def get(self):
         self.currentTemp = self.currentTemp - 2
-        self.currentTemp = round(self.currentTemp + ((self.blower.state / 100) * 5), 2)
+        self.currentTemp = round(self.currentTemp + ((self.pitController.state / 100) * 5), 2)
         self.currentTemp = max(self.currentTemp, 20)
         return self.currentTemp       
 

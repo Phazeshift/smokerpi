@@ -10,16 +10,7 @@ object-assign
   http://jedwatson.github.io/classnames
 */
 
-/*!
- * The buffer module from node.js, for the browser.
- *
- * @author   Feross Aboukhadijeh <http://feross.org>
- * @license  MIT
- */
-
 /*! decimal.js-light v2.5.0 https://github.com/MikeMcl/decimal.js-light/LICENCE */
-
-/*! https://mths.be/utf8js v2.1.2 by @mathias */
 
 /** @license React v0.19.1
  * scheduler.production.min.js

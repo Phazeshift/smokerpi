@@ -1,11 +1,28 @@
-import {LOAD_DATA_SUCCESS, SOCKET_MESSAGE_RECEIVED} from "../actions/actions";
+import {LOAD_GRAPH_DATA_SUCCESS, LOAD_CONFIG_DATA_SUCCESS, LOAD_STATE_DATA_SUCCESS, SOCKET_MESSAGE_RECEIVED} from "../actions/actions";
 
-export default function reducer(state = { graphData: [] }, action) {
+export default function reducer(state = { graphData: [], graphIndex: 0 }, action) {
     switch (action.type) {
-        case LOAD_DATA_SUCCESS: {
+        case LOAD_GRAPH_DATA_SUCCESS: {
+            var graphData = [...state.graphData];
+            graphData = graphData.concat(action.data);
+            var maxGraph = graphData.reduce((max, n) => n.i > max ? n.i : max, 0) + 1;
+
             return {
                 ...state,
-                ...action.data
+                graphIndex: maxGraph,
+                graphData: graphData
+            }
+        }
+        case LOAD_CONFIG_DATA_SUCCESS: {
+            return {
+                ...state,                
+                config: action.data
+            }
+        }
+        case LOAD_STATE_DATA_SUCCESS: {
+            return {
+                ...state,                
+                state: action.data
             }
         }
         case SOCKET_MESSAGE_RECEIVED: {
