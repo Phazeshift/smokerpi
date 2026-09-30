@@ -11,10 +11,10 @@ class Controls extends Component {
       <Row>
         <Col className='d-flex justify-content-center'>
           <ButtonGroup>                   
-            <Button variant="light" className='ml-1' onClick={this.props.toggleBlower}>Toggle Blower</Button>             
-            <Button variant="light" className='ml-1' onClick={this.props.toggleDamper}>Toggle Damper</Button>  
-            <Button variant="light" className='ml-1' onClick={this.props.toggleAutomatic}>Toggle Pid</Button>  
-            <Button variant="light" className='ml-1' onClick={() => this.props.getGraphData()}>Update Graph</Button>           
+            <Button variant="light" className='ms-1' onClick={this.props.toggleBlower}>Toggle Blower</Button>             
+            <Button variant="light" className='ms-1' onClick={this.props.toggleDamper}>Toggle Damper</Button>  
+            <Button variant="light" className='ms-1' onClick={this.props.toggleAutomatic}>Toggle Pid</Button>  
+            <Button variant="light" className='ms-1' onClick={() => this.props.getGraphData()}>Update Graph</Button>           
           </ButtonGroup>
         </Col>
       </Row> )
