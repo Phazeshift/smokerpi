@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import * as actions from './actions/actions';
 import { Container, Button, Row, Form } from 'react-bootstrap';
-import { FormInput } from  './forminput.js'
+import { FormInput } from './forminput'
 
 class Config extends Component {    
     state = {        
