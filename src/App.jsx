@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     BrowserRouter as Router,
-    Switch,
+    Routes,
     Route
   } from "react-router-dom";
   import MyNavBar from './NavBar';
@@ -13,16 +13,12 @@ import {
       <Router>
           <MyNavBar appTitle='SmokerPi' />
         <div>  
-          {/* A <Switch> looks through its children <Route>s and
-              renders the first one that matches the current URL. */}
-          <Switch>            
-            <Route path="/config">
-              <Config />
-            </Route>
-            <Route path="/">
-              <Home />
-            </Route>
-          </Switch>
+          {/* <Routes> renders the best-matching <Route> for the current URL;
+              the "*" route keeps the old behaviour of showing Home for any other path. */}
+          <Routes>
+            <Route path="/config" element={<Config />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
         </div>
       </Router>
     );
