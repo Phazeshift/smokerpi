@@ -1,0 +1,54 @@
+name: Release
+
+# Pushing a tag like v1.2.3 builds the frontend and publishes smokerpi.tar.gz,
+# a ready-to-run bundle (built frontend + backend code) that update.sh on the
+# Pi downloads. Tag a commit that has already passed CI on master.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend
+        # See ci.yml: webpack 4 needs the legacy OpenSSL provider on Node 17+.
+        env:
+          NODE_OPTIONS: '--openssl-legacy-provider'
+        run: yarn build
+
+      - name: Package bundle
+        run: |
+          set -euo pipefail
+          root=dist/smokerpi
+          mkdir -p "$root/api"
+          cp -r build "$root/build"
+          cp -r api/smokerpi "$root/api/smokerpi"
+          cp api/runserver.py api/requirements.txt api/.flaskenv "$root/api/"
+          cp runserver.sh update.sh install.sh smokerpiboot "$root/"
+          echo "$GITHUB_REF_NAME" > "$root/VERSION"
+          find "$root" -name __pycache__ -type d -prune -exec rm -rf {} +
+          tar -czf smokerpi.tar.gz -C dist smokerpi
+          tar -tzf smokerpi.tar.gz | head -20
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" smokerpi.tar.gz --title "$GITHUB_REF_NAME" --generate-notes

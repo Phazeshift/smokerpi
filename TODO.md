@@ -14,7 +14,6 @@ Held back at the 2026-09 dependency update because each is a migration, not a bu
 ## Cleanup
 
 - [ ] Remove unused `package.json` entries: `react-thunk`, `create-react-app`, and the webpack-only packages (`css-loader`, `html-loader`, `svg-inline-loader`, `html-webpack-plugin`, `babel-loader`, `@babel/*`), plus the `buildwebpack` script. Nothing in the repo has a webpack/Babel config or imports them.
-- [ ] `build/` is tracked in git; decide whether to keep committing it or gitignore it and build on deploy.
 
 ## Verification
 

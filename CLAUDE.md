@@ -27,6 +27,12 @@ On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Ev
 
 CI (`.github/workflows/ci.yml`) runs both suites plus a frontend build on every push/PR to `master`, including Dependabot PRs — treat a red CI run on a dependency bump as a real finding, not a fluke (see `api/requirements.txt`'s history for two examples where a Dependabot-proposed bump was incompatible with other pinned packages and CI was what caught it).
 
+## Deployment
+
+`build/` is gitignored — it is not committed. Pushing a tag like `v1.2.3` runs `.github/workflows/release.yml`, which builds the frontend and publishes a GitHub Release containing `smokerpi.tar.gz` (built frontend + `api/smokerpi`, `runserver.py`, `requirements.txt`, the shell scripts, and a `VERSION` file). On the Pi, `sudo ./update.sh` finds the latest release, installs it over the current directory, runs `pip install` only if `requirements.txt` changed, and restarts the `smokerpiboot` init service. It preserves `api/config.json` and `api/venv`. Tag only commits that have passed CI on `master`.
+
+`runserver.sh` uses `exec python ...` on purpose: the init script's PID file must track python itself or a service restart leaves the old server holding the port. Shell scripts are pinned to LF via `.gitattributes`.
+
 ## Architecture
 
 ### Backend: app factory + module-level hardware setup
