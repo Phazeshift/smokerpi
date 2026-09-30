@@ -13,7 +13,6 @@ const fullConfig = {
   set_temperature: 105,
   graph_interval: 10,
   worker_interval: 10,
-  blower_minimum: 40,
   damper_minimum: 500,
   damper_maximum: 2500,
 };
@@ -33,7 +32,7 @@ test('renders the form pre-filled with the current config', () => {
   renderConfig();
 
   expect(screen.getByLabelText('Target temperature')).toHaveValue('105');
-  expect(screen.getByLabelText('Blower minimum')).toHaveValue('40');
+  expect(screen.getByLabelText('Damper min')).toHaveValue('500');
 });
 
 test('clearing the required target temperature keeps the form; Save shows an error and does not post', () => {
@@ -95,14 +94,14 @@ test('shows the pin and interval settings as read-only, and the editable ones as
 
   ['Graph interval', 'Max CS Pin', 'Max Clock Pin', 'Max Data Pin', 'Blower pin 1', 'Blower pin 2', 'Damper pin']
     .forEach(label => expect(screen.getByLabelText(label)).toBeDisabled());
-  ['Target temperature', 'Blower minimum', 'Damper min', 'Damper max']
+  ['Target temperature', 'Damper min', 'Damper max']
     .forEach(label => expect(screen.getByLabelText(label)).not.toBeDisabled());
   expect(screen.getByText(/edit config\.json/i)).toBeInTheDocument();
 });
 
 test.each([
   ['Target temperature', 'hot'],
-  ['Blower minimum', '12.5'],
+  ['Damper max', '12.5'],
   ['Damper min', ''],
 ])('%s = "%s" shows an error next to the field and is not posted', (label, value) => {
   renderConfig();
@@ -123,6 +122,20 @@ test('posts only the editable settings, not the read-only ones', () => {
 
   const postCall = fetch.mock.calls.find(([url]) => url === '/api/config');
   expect(Object.keys(JSON.parse(postCall[1].body)).sort()).toEqual(
-    ['blower_minimum', 'damper_maximum', 'damper_minimum', 'set_temperature']
+    ['damper_maximum', 'damper_minimum', 'set_temperature']
   );
+});
+
+test('does not show or post blower_minimum, even if the server still sends it', () => {
+  // older config.json files may still contain it; it was never used by the control loop
+  renderWithStore(<Config />, {
+    preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config: { ...fullConfig, blower_minimum: 40 } } },
+  });
+  fetch.mockClear();
+
+  expect(screen.queryByLabelText('Blower minimum')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('Save'));
+
+  const postCall = fetch.mock.calls.find(([url]) => url === '/api/config');
+  expect(JSON.parse(postCall[1].body)).not.toHaveProperty('blower_minimum');
 });

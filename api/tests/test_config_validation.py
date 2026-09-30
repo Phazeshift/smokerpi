@@ -13,7 +13,6 @@ def isolated_cwd(tmp_path, monkeypatch):
 def valid_payload(**overrides):
     payload = {
         'set_temperature': 130,
-        'blower_minimum': 50,
         'damper_minimum': 600,
         'damper_maximum': 2400,
     }
@@ -33,12 +32,10 @@ class TestRejectsInvalidConfig:
         ('set_temperature', True),
         ('set_temperature', 0),
         ('set_temperature', -5),
-        ('blower_minimum', ''),
-        ('blower_minimum', 'abc'),
-        ('blower_minimum', 12.5),
-        ('blower_minimum', -1),
-        ('blower_minimum', 101),
+        ('damper_minimum', ''),
+        ('damper_minimum', 'abc'),
         ('damper_minimum', 499),
+        ('damper_maximum', 12.5),
         ('damper_maximum', 2501),
     ])
     def test_400_names_the_field_and_changes_nothing(self, client, field, value):
@@ -57,7 +54,7 @@ class TestRejectsInvalidConfig:
         assert response.status_code == 400
         assert 'damper_minimum' in json.loads(response.data)['errors']
 
-    @pytest.mark.parametrize('field', ['set_temperature', 'blower_minimum', 'damper_minimum', 'damper_maximum'])
+    @pytest.mark.parametrize('field', ['set_temperature', 'damper_minimum', 'damper_maximum'])
     def test_a_missing_field_is_a_400_not_a_server_error(self, client, field):
         payload = valid_payload()
         del payload[field]
@@ -66,9 +63,9 @@ class TestRejectsInvalidConfig:
         assert field in json.loads(response.data)['errors']
 
     def test_reports_every_problem_at_once(self, client):
-        response = client.post('/api/config', json=valid_payload(set_temperature='x', blower_minimum=500))
+        response = client.post('/api/config', json=valid_payload(set_temperature='x', damper_maximum=9999))
         errors = json.loads(response.data)['errors']
-        assert set(errors) == {'set_temperature', 'blower_minimum'}
+        assert set(errors) == {'set_temperature', 'damper_maximum'}
 
     @pytest.mark.parametrize('kwargs', [
         {'data': 'not json', 'content_type': 'application/json'},
@@ -84,7 +81,7 @@ class TestRejectsInvalidConfig:
 class TestAcceptsValidConfig:
     def test_numeric_strings_are_accepted_as_the_frontend_sends_them(self, app, client):
         response = client.post('/api/config', json=valid_payload(
-            set_temperature='140', blower_minimum='45', damper_minimum='550', damper_maximum='2450'))
+            set_temperature='140', damper_minimum='550', damper_maximum='2450'))
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['set_temperature'] == 140 and isinstance(data['set_temperature'], int)
@@ -92,7 +89,7 @@ class TestAcceptsValidConfig:
 
     def test_the_documented_limits_themselves_are_valid(self, client):
         response = client.post('/api/config', json=valid_payload(
-            blower_minimum=0, damper_minimum=500, damper_maximum=2500))
+            damper_minimum=500, damper_maximum=2500))
         assert response.status_code == 200
 
     def test_read_only_settings_are_ignored_not_applied(self, client):
@@ -102,6 +99,18 @@ class TestAcceptsValidConfig:
         after = json.loads(response.data)
         for key in ('cs_pin', 'graph_interval', 'damper_pin'):
             assert after[key] == before[key]
+
+
+class TestRemovedBlowerMinimum:
+    def test_a_stale_blower_minimum_in_the_payload_is_ignored_not_rejected(self, client):
+        # e.g. a browser still running the previous frontend, which posted it
+        response = client.post('/api/config', json=valid_payload(blower_minimum=999))
+        assert response.status_code == 200
+        assert 'blower_minimum' not in json.loads(response.data)
+
+    def test_it_is_not_reported_when_missing(self, client):
+        response = client.post('/api/config', json=valid_payload(set_temperature='x'))
+        assert 'blower_minimum' not in json.loads(response.data)['errors']
 
 
 class TestServerErrors:

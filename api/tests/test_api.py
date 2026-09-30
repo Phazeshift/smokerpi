@@ -28,7 +28,6 @@ class TestConfigEndpoint:
     def test_post_updates_config_and_dependent_hardware(self, app, client):
         response = client.post('/api/config', json={
             'set_temperature': 130,
-            'blower_minimum': 50,
             'damper_minimum': 600,
             'damper_maximum': 2400,
         })
@@ -47,7 +46,6 @@ class TestConfigEndpoint:
 
         client.post('/api/config', json={
             'set_temperature': 140,
-            'blower_minimum': 40,
             'damper_minimum': 500,
             'damper_maximum': 2500,
         })

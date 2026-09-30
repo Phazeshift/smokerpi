@@ -7,7 +7,6 @@ import { FormInput } from './forminput'
 // The settings the API accepts (see EDITABLE_FIELDS in api/smokerpi/config.py).
 const EDITABLE_FIELDS = [
   { name: 'set_temperature', label: 'Target temperature' },
-  { name: 'blower_minimum', label: 'Blower minimum' },
   { name: 'damper_minimum', label: 'Damper min' },
   { name: 'damper_maximum', label: 'Damper max' },
 ];

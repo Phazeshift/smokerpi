@@ -3,12 +3,11 @@ import re
 
 # Settings the API lets a client change. Everything else in the config (pins, intervals)
 # is read-only over the API: it needs a restart to take effect, so edit config.json.
-EDITABLE_FIELDS = ('set_temperature', 'blower_minimum', 'damper_minimum', 'damper_maximum')
+EDITABLE_FIELDS = ('set_temperature', 'damper_minimum', 'damper_maximum')
 
-# Limits, from the hardware code: the blower state is a 0-100 percentage, and the damper
-# maps 0-100 onto a servo pulse width between damper_minimum and damper_maximum, which
-# pigpio only accepts between 500 and 2500 microseconds.
-BLOWER_MIN, BLOWER_MAX = 0, 100
+# Limits, from the hardware code: the damper maps 0-100 onto a servo pulse width between
+# damper_minimum and damper_maximum, which pigpio only accepts between 500 and 2500
+# microseconds.
 SERVO_MIN, SERVO_MAX = 500, 2500
 
 
@@ -32,7 +31,6 @@ def validateEditableConfig(payload):
     how the web form sends them."""
     bounds = {
         'set_temperature': (1, None, 'must be a whole number above 0'),
-        'blower_minimum': (BLOWER_MIN, BLOWER_MAX, 'must be a whole number between %d and %d' % (BLOWER_MIN, BLOWER_MAX)),
         'damper_minimum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
         'damper_maximum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
     }
@@ -101,4 +99,4 @@ class Config:
             json.dump(data, configfile)
 
     def defaultConfig(self):
-        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'blower_minimum': 40, 'damper_minimum': 500, 'damper_maximum': 2500 }        
+        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'damper_minimum': 500, 'damper_maximum': 2500 }        
