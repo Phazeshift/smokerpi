@@ -38,6 +38,11 @@ main() {
 
     # Install Python deps first so a failure leaves the running install untouched.
     if ! cmp -s api/requirements.txt "$new/api/requirements.txt"; then
+        if ! api/venv/bin/python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
+            echo "This release needs Python 3.9 or newer, but the venv uses $(api/venv/bin/python --version 2>&1)." >&2
+            echo "Upgrade Raspberry Pi OS and reinstall (see the README); nothing has been changed." >&2
+            return 1
+        fi
         echo "requirements.txt changed; installing Python dependencies"
         api/venv/bin/pip install -r "$new/api/requirements.txt"
     fi
