@@ -34,4 +34,4 @@ class Config:
             json.dump(data, configfile)
 
     def defaultConfig(self):
-        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 19, 'blower_pin2': 26, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'blower_minimum': 40, 'damper_minimum': 500, 'damper_maximum': 2500 }        
+        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'blower_minimum': 40, 'damper_minimum': 500, 'damper_maximum': 2500 }        
