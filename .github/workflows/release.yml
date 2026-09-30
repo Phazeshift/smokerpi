@@ -46,7 +46,7 @@ jobs:
           echo "$GITHUB_REF_NAME" > "$root/VERSION"
           find "$root" -name __pycache__ -type d -prune -exec rm -rf {} +
           tar -czf smokerpi.tar.gz -C dist smokerpi
-          tar -tzf smokerpi.tar.gz | head -20
+          tar -tzf smokerpi.tar.gz | sed -n '1,20p'
 
       - name: Create release
         env:
