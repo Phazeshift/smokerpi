@@ -1,13 +1,12 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import { Form } from 'react-bootstrap';
 
 export const FormInput = ({
         name,
-        type,
+        type = 'text',
         placeholder,
         onChange,
-        className,
+        className = '',
         value,
         error,
         children,
@@ -31,18 +30,4 @@ export const FormInput = ({
             { error && <p>{ error }</p>}
           </Form.Group>
         )
-      }
-      
-      FormInput.defaultProps = {
-        type: "text",
-        className: ""
-      }
-      
-      FormInput.propTypes = {
-        name: PropTypes.string.isRequired,        
-        placeholder: PropTypes.string.isRequired,
-        type: PropTypes.oneOf(['text', 'number', 'password']),
-        className: PropTypes.string,
-        value: PropTypes.any,
-        onChange: PropTypes.func.isRequired
       }

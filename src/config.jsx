@@ -21,8 +21,16 @@ class Config extends Component {
       this.props.getConfig();
     }
 
-    componentWillReceiveProps(nextProps) {                
-        this.setState({ config: { ...nextProps }});        
+    // Re-sync the editable copy when the connected props change (e.g. after getConfig
+    // completes). Compare prop values, not the props object: componentDidUpdate also
+    // runs after our own setState, and in React 19 a class component gets a fresh props
+    // object on every render (react-redux passes a ref prop, which React strips by
+    // copying), so an identity check would loop forever.
+    componentDidUpdate(prevProps) {
+        const keys = new Set([...Object.keys(prevProps), ...Object.keys(this.props)]);
+        if ([...keys].some(key => prevProps[key] !== this.props[key])) {
+            this.setState({ config: { ...this.props }});
+        }
     }
 
     onSubmit = () => {

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SmokerPi: a Raspberry Pi app that controls a BBQ smoker's blower/damper via a PID loop and reports temperature. It's two apps in one repo, meant to be deployed together on the Pi:
 
-- `src/` — React 18 + Redux frontend (built with Vite, tested with Vitest).
+- `src/` — React 19 + Redux frontend (built with Vite, tested with Vitest).
 - `api/` — Flask backend (`api/smokerpi/`) that drives the hardware and serves the built frontend as static files.
 
 On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Everywhere else (Windows/macOS dev machines, Linux CI), it runs against emulated hardware automatically — see "Hardware emulation" below. This is what makes the backend testable off-Pi at all.
@@ -71,3 +71,4 @@ Failed API calls dispatch `API_ERROR` (with a message); `errorbanner.jsx`, rende
 
 - `api/requirements.txt` is UTF-8-with-BOM (not plain UTF-8, not UTF-16 — it's been both at different points in this repo's history after tooling round-trips). If you edit it, verify the byte-level encoding survived (`open(path, 'rb').read()[:5]` should start `\xef\xbb\xbf`) before committing — a naive text edit through a tool that assumes ASCII/UTF-8-without-BOM can silently corrupt it, and Git will refuse to line-merge it (reports "Cannot merge binary files") if two branches touch it with different encodings.
 - Files containing JSX must use the `.jsx` extension (Vite does not parse JSX in `.js`). Imports must match filename casing exactly — Windows/macOS filesystems are case-insensitive so a wrong-case import (e.g. `./app` for `App.js`) works locally and only breaks the production build on Linux (this happened for real; see `src/index.js`'s git history).
+- React 19 ignores `defaultProps` and `propTypes` on function components; use default parameter values. Class components under `connect` get a fresh props object on every render (react-redux passes a `ref` prop, which React 19 strips by copying), so never compare `prevProps !== this.props` in `componentDidUpdate` — compare the prop values (see `config.jsx`), or it loops forever.

@@ -47,3 +47,19 @@ test('shows the error message when an error is passed', () => {
 
   expect(screen.getByText('Enter value')).toBeInTheDocument();
 });
+
+test('defaults to a text input and only adds the className it is given', () => {
+  render(
+    <FormInput
+      label="Target temperature"
+      name="set_temperature"
+      value=""
+      placeholder="Enter value..."
+      onChange={() => {}}
+    />
+  );
+
+  const input = screen.getByLabelText('Target temperature');
+  expect(input).toHaveAttribute('type', 'text');
+  expect(input).toHaveClass('form-control');
+});
