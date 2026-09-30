@@ -7,6 +7,7 @@ export const FormInput = ({
         placeholder,
         onChange,
         className = '',
+        disabled,
         value,
         error,
         children,
@@ -25,6 +26,7 @@ export const FormInput = ({
               onChange={onChange}
               value={value}
               className={className}
+              disabled={disabled}
               style={error && {border: 'solid 1px red'}}
             />
             { error && <p>{ error }</p>}

@@ -4,20 +4,54 @@ import * as actions from './actions/actions';
 import { Container, Button, Form } from 'react-bootstrap';
 import { FormInput } from './forminput'
 
-class Config extends Component {    
-    state = {        
-        errors: {},
-        submitted: false
+// The settings the API accepts (see EDITABLE_FIELDS in api/smokerpi/config.py).
+const EDITABLE_FIELDS = [
+  { name: 'set_temperature', label: 'Target temperature' },
+  { name: 'blower_minimum', label: 'Blower minimum' },
+  { name: 'damper_minimum', label: 'Damper min' },
+  { name: 'damper_maximum', label: 'Damper max' },
+];
+
+// Shown for information only: the API ignores these, because they need a restart to take
+// effect. They live in config.json on the Pi.
+const READ_ONLY_FIELDS = [
+  { name: 'graph_interval', label: 'Graph interval' },
+  { name: 'cs_pin', label: 'Max CS Pin' },
+  { name: 'clock_pin', label: 'Max Clock Pin' },
+  { name: 'data_pin', label: 'Max Data Pin' },
+  { name: 'blower_pin1', label: 'Blower pin 1' },
+  { name: 'blower_pin2', label: 'Blower pin 2' },
+  { name: 'damper_pin', label: 'Damper pin' },
+];
+
+const isWholeNumber = value => /^\s*-?\d+\s*$/.test(String(value));
+
+// Ranges are checked by the server, which explains any rejection in the error banner.
+const validate = config => {
+  const errors = {};
+  EDITABLE_FIELDS.forEach(({ name }) => {
+    const value = config[name];
+    if (value === undefined || value === null || String(value).trim() === '') {
+      errors[name] = 'Enter value';
+    } else if (!isWholeNumber(value)) {
+      errors[name] = 'Enter a whole number';
+    }
+  });
+  return errors;
+};
+
+class Config extends Component {
+    state = {
+        errors: {}
       };
 
     handleChange = event => {
-        const { config } = this.state;        
-        config[event.target.name] = event.target.value;
-        this.setState({ config });
+        const { name, value } = event.target;
+        this.setState(({ config }) => ({ config: { ...config, [name]: value } }));
       };
 
-    componentDidMount() {            
-      this.setState({ config: { ...this.props }});       
+    componentDidMount() {
+      this.setState({ config: { ...this.props }});
       this.props.getConfig();
     }
 
@@ -34,24 +68,33 @@ class Config extends Component {
     }
 
     onSubmit = () => {
-        const {
-          config: { set_temperature }
-        } = this.state;
-        let err = {};
-    
-        if (!set_temperature) {
-          err.set_temperature = "Enter value";
+        const { config } = this.state;
+        const errors = validate(config);
+        this.setState({ errors });
+        if (Object.keys(errors).length === 0) {
+          const editable = {};
+          EDITABLE_FIELDS.forEach(({ name }) => { editable[name] = config[name]; });
+          this.props.updateConfig(editable);
         }
-        
-        this.setState({ errors: err }, () => {
-          if (Object.getOwnPropertyNames(this.state.errors).length === 0) {
-            this.setState({ submitted: true });            
-            this.props.updateConfig(this.state.config);    
-          }
-        });
       };
 
-    render() {    
+    renderFields(fields, extraProps) {
+        const { config, errors } = this.state;
+        return fields.map(({ name, label }) => (
+          <FormInput
+            key={name}
+            label={label}
+            name={name}
+            value={config[name]}
+            onChange={this.handleChange}
+            placeholder="Enter value..."
+            error={errors[name]}
+            {...extraProps}
+          />
+        ));
+      }
+
+    render() {
         // Show a placeholder until the config has been fetched. This must test whether
         // it has loaded, not whether a field is non-empty: clearing a field would
         // otherwise replace the whole form.
@@ -62,149 +105,30 @@ class Config extends Component {
               </Container>
             );
         }
-        
-        const {            
-            errors
-          } = this.state;
-      return (         
-        <Container>   
+
+        return (
+          <Container>
             <h2>Config</h2>
-            <Form>
-            <FormInput
-              label="Target temperature"
-              name="set_temperature"
-              type="text"
-              value={this.state.config.set_temperature}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.set_temperature}
-              required
-              className="input"
-             />
-             <FormInput
-              label="Blower minimum"
-              name="blower_minimum"
-              type="text"
-              value={this.state.config.blower_minimum}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.blower_minimum}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Graph interval"
-              name="graph_interval"
-              type="text"
-              value={this.state.config.graph_interval}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.graph_interval}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Max CS Pin"
-              name="cs_pin"
-              type="text"
-              value={this.state.config.cs_pin}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.cs_pin}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Max Clock Pin"
-              name="clock_pin"
-              type="text"
-              value={this.state.config.clock_pin}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.clock_pin}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Max Data Pin"
-              name="data_pin"
-              type="text"
-              value={this.state.config.data_pin}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.data_pin}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Blower pin 1"
-              name="blower_pin1"
-              type="text"
-              value={this.state.config.blower_pin1}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.blower_pin1}
-              required
-              className="input"
-            />
-             <FormInput
-              label="Blower pin 2"
-              name="blower_pin2"
-              type="text"
-              value={this.state.config.blower_pin2}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.blower_pin2}
-              required
-              className="input"
-            />
-             <FormInput
-              label="Damper pin"
-              name="damper_pin"
-              type="text"
-              value={this.state.config.damper_pin}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.damper_pin}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Damper min"
-              name="damper_minimum"
-              type="text"
-              value={this.state.config.damper_minimum}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.damper_minimum}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Damper max"
-              name="damper_maximum"
-              type="text"
-              value={this.state.config.damper_maximum}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.damper_maximum}
-              required
-              className="input"
-            />
-            </Form>
+            <Form>{this.renderFields(EDITABLE_FIELDS)}</Form>
             <div className="mb-3"><Button onClick={this.onSubmit}>Save</Button></div>
-        </Container>        
-      );  
+
+            <h5 className="mt-4">Hardware and timing</h5>
+            <p className="text-muted">
+              These can't be changed here. Edit config.json on the Pi and restart SmokerPi to change them.
+            </p>
+            <Form>{this.renderFields(READ_ONLY_FIELDS, { disabled: true })}</Form>
+          </Container>
+        );
     }
 }
 
 const mapStateToProps = state => ({
   ...state.smokerpi.config
  })
-    
+
 const mapDispatchToProps = dispatch => ({
-  getConfig: () => dispatch(actions.getConfig()),  
-  updateConfig: (config) => dispatch(actions.updateConfig(config)),  
+  getConfig: () => dispatch(actions.getConfig()),
+  updateConfig: (config) => dispatch(actions.updateConfig(config)),
  })
-    
+
 export default connect(mapStateToProps, mapDispatchToProps)(Config);

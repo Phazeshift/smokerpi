@@ -63,3 +63,18 @@ test('defaults to a text input and only adds the className it is given', () => {
   expect(input).toHaveAttribute('type', 'text');
   expect(input).toHaveClass('form-control');
 });
+
+test('can be disabled', () => {
+  render(
+    <FormInput
+      label="Max CS Pin"
+      name="cs_pin"
+      value="20"
+      placeholder="Enter value..."
+      onChange={() => {}}
+      disabled
+    />
+  );
+
+  expect(screen.getByLabelText('Max CS Pin')).toBeDisabled();
+});
