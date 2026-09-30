@@ -31,7 +31,7 @@ main() {
 
     local tmp
     tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' EXIT
+    trap "rm -rf '$tmp'" EXIT
     curl -fsSL -o "$tmp/smokerpi.tar.gz" "https://github.com/$REPO/releases/download/$latest/smokerpi.tar.gz"
     tar -xzf "$tmp/smokerpi.tar.gz" -C "$tmp"
     local new="$tmp/smokerpi"
