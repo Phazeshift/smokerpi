@@ -27,7 +27,6 @@ The wiring and settings of the smoker's Pi, as reported by the running app (`/ap
 - **Thermocouple:** a MAX31855 read over software (bit-banged) SPI on those three GPIOs, so the Pi's SPI interface does not need enabling. It reports degrees Celsius in 0.25 degree steps.
 - **Blower:** two outputs, wired like a motor driver's two inputs. Pin 1 high with pin 2 low is on, both low is off, and partial speed is 100 Hz PWM on pin 1.
 - **Damper:** a hobby servo driven through [pigpio](https://abyz.me.uk/rpi/pigpio/), so the `pigpiod` daemon must be running (`sudo apt install pigpio && sudo systemctl enable --now pigpiod`; `install.sh` offers to do this). The servo is only pulsed for about a second per move.
-- **`damper_pin` is currently ignored:** `Damper.__init__` in `api/smokerpi/hardware/damper2.py` always uses GPIO 13. That matches this install, but changing the value in `config.json` would have no effect.
 
 ### Settings
 
