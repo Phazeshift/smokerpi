@@ -105,17 +105,17 @@ describe('getConfig / getCurrentState', () => {
 describe('server error messages', () => {
   test('a failed POST shows the message from a JSON error body', async () => {
     fetchMock.mockResponseOnce(
-      JSON.stringify({ error: 'Invalid configuration: blower_minimum must be a whole number between 0 and 100' }),
+      JSON.stringify({ error: 'Invalid configuration: damper_minimum must be a whole number between 500 and 2500' }),
       { status: 400, statusText: 'BAD REQUEST' }
     );
     const store = mockStore({});
 
-    await store.dispatch(updateConfig({ blower_minimum: '500' }));
+    await store.dispatch(updateConfig({ damper_minimum: '100' }));
 
     expect(store.getActions()).toEqual([
       {
         type: API_ERROR,
-        message: 'Error calling api: Invalid configuration: blower_minimum must be a whole number between 0 and 100',
+        message: 'Error calling api: Invalid configuration: damper_minimum must be a whole number between 500 and 2500',
       },
     ]);
   });

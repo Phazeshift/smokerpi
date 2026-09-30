@@ -37,6 +37,20 @@ class TestApplyTestConfig:
         assert data['graph_interval'] == 10
 
 
+class TestRemovedBlowerMinimum:
+    """blower_minimum was saved and editable but never read by the control loop, so it
+    was removed. Older config.json files may still contain it."""
+
+    def test_is_no_longer_a_default(self):
+        assert 'blower_minimum' not in Config(test=False).defaultConfig()
+
+    def test_a_leftover_value_in_config_json_is_tolerated_and_preserved(self, tmp_path):
+        (tmp_path / 'config.json').write_text(json.dumps({'blower_minimum': 40, 'set_temperature': 130}))
+        data = Config(test=False).loadConfig()
+        assert data['set_temperature'] == 130
+        assert data['blower_minimum'] == 40
+
+
 class TestLoadConfig:
     def test_returns_defaults_when_no_file_exists(self):
         config = Config(test=False)
@@ -55,7 +69,7 @@ class TestLoadConfig:
         assert data['set_temperature'] == 225
         # keys added to defaultConfig() since the file was last written are
         # still backfilled
-        assert data['blower_minimum'] == config.defaultConfig()['blower_minimum']
+        assert data['damper_minimum'] == config.defaultConfig()['damper_minimum']
 
     def test_applies_test_scaling_when_loading_in_test_mode(self):
         config = Config(test=True)
