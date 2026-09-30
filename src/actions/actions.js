@@ -42,15 +42,29 @@ export const toggleAutomatic = () => (dispatch, getState) => {
     return postApi(dispatch, `/api/pid`, { enabled: !enabled }, () => dispatch(getCurrentState()));
     }
 
+// Prefer the message the server sent ({"error": "..."}) over the bare HTTP status text.
+const responseError = async response => {
+    let message = response.statusText;
+    try {
+        const body = await response.json();
+        if (body && body.error) {
+            message = body.error;
+        }
+    } catch (e) {
+        // not JSON; keep the status text
+    }
+    return new Error(message);
+};
+
 const apiError = error => ({ type: API_ERROR, message: `Error calling api: ${error.message}` });
 
 const api = (dispatch, url, action) => {       
     return fetch(url)
-        .then(response => {
+        .then(async response => {
             if (response.ok) {
                 return response.json();
             }
-            throw new Error(response.statusText);
+            throw await responseError(response);
         })
         .then(
             data => {
@@ -67,11 +81,11 @@ const postApi = (dispatch, url, postData, then) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(postData) 
         })
-        .then(response => {
+        .then(async response => {
             if (response.ok) {
                 return response.json();
             }
-            throw new Error(response.statusText);
+            throw await responseError(response);
         })
         .then(
             data => {

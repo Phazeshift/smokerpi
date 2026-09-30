@@ -89,3 +89,40 @@ test('submitting a valid change posts the updated config', () => {
   expect(opts.method).toBe('POST');
   expect(JSON.parse(opts.body).set_temperature).toBe('130');
 });
+
+test('shows the pin and interval settings as read-only, and the editable ones as editable', () => {
+  renderConfig();
+
+  ['Graph interval', 'Max CS Pin', 'Max Clock Pin', 'Max Data Pin', 'Blower pin 1', 'Blower pin 2', 'Damper pin']
+    .forEach(label => expect(screen.getByLabelText(label)).toBeDisabled());
+  ['Target temperature', 'Blower minimum', 'Damper min', 'Damper max']
+    .forEach(label => expect(screen.getByLabelText(label)).not.toBeDisabled());
+  expect(screen.getByText(/edit config\.json/i)).toBeInTheDocument();
+});
+
+test.each([
+  ['Target temperature', 'hot'],
+  ['Blower minimum', '12.5'],
+  ['Damper min', ''],
+])('%s = "%s" shows an error next to the field and is not posted', (label, value) => {
+  renderConfig();
+  fetch.mockClear();
+
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  fireEvent.click(screen.getByText('Save'));
+
+  expect(screen.getByText(value === '' ? 'Enter value' : 'Enter a whole number')).toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalledWith('/api/config', expect.anything());
+});
+
+test('posts only the editable settings, not the read-only ones', () => {
+  renderConfig();
+  fetch.mockClear();
+
+  fireEvent.click(screen.getByText('Save'));
+
+  const postCall = fetch.mock.calls.find(([url]) => url === '/api/config');
+  expect(Object.keys(JSON.parse(postCall[1].body)).sort()).toEqual(
+    ['blower_minimum', 'damper_maximum', 'damper_minimum', 'set_temperature']
+  );
+});

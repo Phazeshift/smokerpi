@@ -76,3 +76,20 @@ class TestSaveConfig:
         reloaded = json.loads((tmp_path / 'config.json').read_text())
         assert reloaded['worker_interval'] == config.defaultConfig()['worker_interval']
         assert reloaded['graph_interval'] == config.defaultConfig()['graph_interval']
+
+    def test_does_not_mutate_the_dict_it_is_given(self):
+        # The API passes the live config, which must not change as a side effect of saving.
+        config = Config(test=False)
+        live = {'set_temperature': 110, 'worker_interval': 1, 'graph_interval': 2}
+        config.saveConfig(live)
+        assert live == {'set_temperature': 110, 'worker_interval': 1, 'graph_interval': 2}
+
+    def test_keeps_intervals_that_were_hand_edited_in_the_file(self, tmp_path):
+        (tmp_path / 'config.json').write_text(json.dumps({'worker_interval': 30, 'graph_interval': 20}))
+        config = Config(test=True)
+        # in test mode the live values are scaled down; saving must not write those back
+        config.saveConfig({'set_temperature': 110, 'worker_interval': 3.0, 'graph_interval': 2.0})
+        saved = json.loads((tmp_path / 'config.json').read_text())
+        assert saved['worker_interval'] == 30
+        assert saved['graph_interval'] == 20
+        assert saved['set_temperature'] == 110

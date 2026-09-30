@@ -1,4 +1,4 @@
-from flask import (Flask, request)
+from flask import (Flask, request, jsonify)
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import json
@@ -7,7 +7,7 @@ from .hardware.blower import Blower
 from .hardware.damper2 import Damper, TestDamper
 from .hardware.pitcontroller import PitController
 from .hardware.max31855 import MAX31855, TestMAX31855, MAX31855Error
-from .config import Config
+from .config import Config, validateEditableConfig
 from simple_pid import PID
 from datetime import datetime
 import array
@@ -101,11 +101,14 @@ def create_app(test_config=None):
     @app.route('/api/config', methods = ['GET', 'POST'])
     def config():
         if request.method == "POST":
-            print(request.json)
-            app.smokerpi_config['set_temperature'] = int(request.json['set_temperature'])
-            app.smokerpi_config['blower_minimum'] = int(request.json['blower_minimum'])
-            app.smokerpi_config['damper_minimum'] = int(request.json['damper_minimum'])
-            app.smokerpi_config['damper_maximum'] = int(request.json['damper_maximum'])
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify(error='Expected a JSON object'), 400
+            values, errors = validateEditableConfig(payload)
+            if errors:
+                message = 'Invalid configuration: ' + '; '.join('%s %s' % (k, v) for k, v in errors.items())
+                return jsonify(error=message, errors=errors), 400
+            app.smokerpi_config.update(values)
             app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
             app.smokerpi_damper.min = app.smokerpi_config['damper_minimum']
             app.smokerpi_damper.max = app.smokerpi_config['damper_maximum']
@@ -174,7 +177,8 @@ def create_app(test_config=None):
 
     @app.errorhandler(InternalServerError)
     def handle_500(e):
-        app.logger.error(e.message)
+        app.logger.error('Unhandled error: %s', e.original_exception or e, exc_info=e.original_exception)
+        return e
 
     def cleanupHardware():
         print("Cleanup")

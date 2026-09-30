@@ -102,6 +102,36 @@ describe('getConfig / getCurrentState', () => {
   });
 });
 
+describe('server error messages', () => {
+  test('a failed POST shows the message from a JSON error body', async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify({ error: 'Invalid configuration: blower_minimum must be a whole number between 0 and 100' }),
+      { status: 400, statusText: 'BAD REQUEST' }
+    );
+    const store = mockStore({});
+
+    await store.dispatch(updateConfig({ blower_minimum: '500' }));
+
+    expect(store.getActions()).toEqual([
+      {
+        type: API_ERROR,
+        message: 'Error calling api: Invalid configuration: blower_minimum must be a whole number between 0 and 100',
+      },
+    ]);
+  });
+
+  test('falls back to the status text when the error body is not JSON', async () => {
+    fetchMock.mockResponseOnce('<html>oops</html>', { status: 502, statusText: 'Bad Gateway' });
+    const store = mockStore({});
+
+    await store.dispatch(getConfig());
+
+    expect(store.getActions()).toEqual([
+      { type: API_ERROR, message: 'Error calling api: Bad Gateway' },
+    ]);
+  });
+});
+
 test('dismissApiError creates the dismiss action', () => {
   expect(dismissApiError()).toEqual({ type: API_ERROR_DISMISSED });
 });

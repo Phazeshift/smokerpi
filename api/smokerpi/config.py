@@ -1,4 +1,61 @@
 import json
+import re
+
+# Settings the API lets a client change. Everything else in the config (pins, intervals)
+# is read-only over the API: it needs a restart to take effect, so edit config.json.
+EDITABLE_FIELDS = ('set_temperature', 'blower_minimum', 'damper_minimum', 'damper_maximum')
+
+# Limits, from the hardware code: the blower state is a 0-100 percentage, and the damper
+# maps 0-100 onto a servo pulse width between damper_minimum and damper_maximum, which
+# pigpio only accepts between 500 and 2500 microseconds.
+BLOWER_MIN, BLOWER_MAX = 0, 100
+SERVO_MIN, SERVO_MAX = 500, 2500
+
+
+def _whole_number(value):
+    if isinstance(value, bool):
+        raise ValueError(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and re.fullmatch(r'\s*-?\d+\s*', value):
+        return int(value)
+    raise ValueError(value)
+
+
+def validateEditableConfig(payload):
+    """Check the editable settings in a POSTed config.
+
+    Returns (values, errors): values maps each valid field to an int, errors maps each
+    invalid or missing field to a message. Numeric strings are accepted because that is
+    how the web form sends them."""
+    bounds = {
+        'set_temperature': (1, None, 'must be a whole number above 0'),
+        'blower_minimum': (BLOWER_MIN, BLOWER_MAX, 'must be a whole number between %d and %d' % (BLOWER_MIN, BLOWER_MAX)),
+        'damper_minimum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
+        'damper_maximum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
+    }
+    values, errors = {}, {}
+    for field in EDITABLE_FIELDS:
+        low, high, message = bounds[field]
+        if field not in payload:
+            errors[field] = 'is required'
+            continue
+        try:
+            number = _whole_number(payload[field])
+        except ValueError:
+            errors[field] = message
+            continue
+        if number < low or (high is not None and number > high):
+            errors[field] = message
+        else:
+            values[field] = number
+    if 'damper_minimum' in values and 'damper_maximum' in values             and values['damper_minimum'] >= values['damper_maximum']:
+        errors['damper_minimum'] = 'must be less than damper_maximum'
+        del values['damper_minimum']
+    return values, errors
+
 
 class Config:    
     def __init__(self, test):
@@ -11,17 +68,27 @@ class Config:
             data['graph_interval'] = data['graph_interval'] / testspeed
 
     def saveConfig(self, data):
-        originalConfig = self.defaultConfig()
-        data['worker_interval'] = originalConfig['worker_interval']
-        data['graph_interval'] = originalConfig['graph_interval']
+        # Save a copy: the caller passes the live config, which must not change as a
+        # side effect of saving.
+        data = dict(data)
+        # The intervals are not editable over the API, and in test mode the live values
+        # are scaled down. Keep whatever is already persisted (falling back to the
+        # defaults) so a save never rewrites them, hand-edited values included.
+        persisted = self.readConfigFile()
+        defaults = self.defaultConfig()
+        for key in ('worker_interval', 'graph_interval'):
+            data[key] = persisted.get(key, defaults[key])
         self.writeConfigFile(data)
 
-    def loadConfig(self):
-        try: 
+    def readConfigFile(self):
+        try:
             with open('config.json') as configfile:
-                data = json.load(configfile)
+                return json.load(configfile)
         except (FileNotFoundError):
-            data = {}
+            return {}
+
+    def loadConfig(self):
+        data = self.readConfigFile()
         defaultdata = self.defaultConfig()
         defaultdata.update(data)
         if (defaultdata != data):
