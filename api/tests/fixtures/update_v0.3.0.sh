@@ -38,11 +38,6 @@ main() {
 
     # Install Python deps first so a failure leaves the running install untouched.
     if ! cmp -s api/requirements.txt "$new/api/requirements.txt"; then
-        if ! api/venv/bin/python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
-            echo "This release needs Python 3.9 or newer, but the venv uses $(api/venv/bin/python --version 2>&1)." >&2
-            echo "Upgrade Raspberry Pi OS and reinstall (see the README); nothing has been changed." >&2
-            return 1
-        fi
         echo "requirements.txt changed; installing Python dependencies"
         api/venv/bin/pip install -r "$new/api/requirements.txt"
     fi
@@ -53,14 +48,9 @@ main() {
     cp "$new/api/runserver.py" "$new/api/requirements.txt" "$new/api/.flaskenv" api/
     cp "$new/runserver.sh" "$new/install.sh" "$new/smokerpiboot" .
     chmod +x runserver.sh install.sh
-    # Replace this script by renaming a new file over it, never by overwriting it in
-    # place. bash reads a script incrementally through an open file handle: an in-place
-    # overwrite changes the bytes under it and it resumes at a stale offset in the new
-    # text ("syntax error near unexpected token"), whereas after a rename the running
-    # bash keeps reading the old file, intact.
-    cp "$new/update.sh" update.sh.new
-    chmod +x update.sh.new
-    mv -f update.sh.new update.sh
+    # update.sh itself is replaced last, below; bash has already parsed main().
+    cp "$new/update.sh" update.sh
+    chmod +x update.sh
     echo "$latest" > VERSION
 
     if [[ -x "/etc/init.d/$SERVICE" ]]; then
@@ -71,8 +61,7 @@ main() {
     echo "Now running $latest."
 }
 
-# Keep the call and the exit on ONE line. bash parses a whole line before running it, so
-# after main returns there is nothing left to read from this file. On two lines, bash
-# would go back to the file for `exit`, at an offset that may now be in the middle of a
-# different, replacement copy of this script.
-main "$@"; exit $?
+# Everything above is parsed before it runs, and we exit before bash could read
+# any bytes of this file that changed underneath it when update.sh is replaced.
+main "$@"
+exit $?
