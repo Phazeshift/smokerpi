@@ -52,11 +52,15 @@ class Config extends Component {
       };
 
     render() {    
-        let text = JSON.stringify(this.state);
-        if (!this.state.config || !this.state.config.set_temperature) { 
-            return ( 
-            <div>{text}</div> 
-            );        
+        // Show a placeholder until the config has been fetched. This must test whether
+        // it has loaded, not whether a field is non-empty: clearing a field would
+        // otherwise replace the whole form.
+        if (!this.state.config || this.state.config.set_temperature === undefined) {
+            return (
+              <Container>
+                <p>Loading configuration...</p>
+              </Container>
+            );
         }
         
         const {            
@@ -65,7 +69,6 @@ class Config extends Component {
       return (         
         <Container>   
             <h2>Config</h2>
-            <div>{text}</div>
             <Form>
             <FormInput
               label="Target temperature"
@@ -86,17 +89,6 @@ class Config extends Component {
               onChange={this.handleChange}
               placeholder="Enter value..."
               error={errors.blower_minimum}
-              required
-              className="input"
-            />
-            <FormInput
-              label="Push interval"
-              name="push_interval"
-              type="text"
-              value={this.state.config.push_interval}
-              onChange={this.handleChange}
-              placeholder="Enter value..."
-              error={errors.push_interval}
               required
               className="input"
             />

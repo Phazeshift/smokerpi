@@ -39,6 +39,8 @@ CI (`.github/workflows/ci.yml`, Node 22 — Vitest requires 22.12+) runs both su
 
 `api/smokerpi/__init__.py` exposes `create_app(test_config=None)`. `test_config` (a dict with optional `config` and `start_worker` keys) lets callers — namely `api/tests/conftest.py` — inject a config dict directly (skipping real `config.json` I/O) and skip starting the background worker thread. A module-level `app = create_app()` at the bottom of the file exists only so `api/runserver.py`'s `from smokerpi import app, cleanupHardware` keeps working for real production startup.
 
+Flask serves the built frontend from `../../build`. Because the React app does its own routing, a NotFound handler in `create_app()` returns `index.html` for unknown GET/HEAD paths that are not under `/api/` and have no file extension (so refreshing or deep-linking `/config` works); API paths and missing files stay real 404s, and with no build present everything stays 404. `api/tests/test_static.py` covers this against a temp static folder, so it needs no frontend build.
+
 Inside `create_app()`, `setup()` runs synchronously: it loads config (`Config` in `config.py`), constructs the hardware objects (`configure()`), and spawns a daemon thread (`worker()`) that polls temperature, feeds it through a `simple_pid.PID` controller, and appends to an in-memory graph-data list every `graph_interval` seconds. All live state (current temperature, graph data, hardware objects, the PID object) is stored directly as attributes on the Flask `app` object (`app.smokerpi_*`), not in a separate model/service layer — routes and the worker loop both read/write these attributes directly.
 
 ### Hardware emulation

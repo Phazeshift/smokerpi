@@ -2,7 +2,7 @@ from flask import (Flask, request)
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import json
-from werkzeug.exceptions import InternalServerError
+from werkzeug.exceptions import InternalServerError, NotFound
 from .hardware.blower import Blower
 from .hardware.damper2 import Damper, TestDamper
 from .hardware.pitcontroller import PitController
@@ -70,6 +70,19 @@ def create_app(test_config=None):
     @app.route('/')
     def index():
         return app.send_static_file('index.html')
+
+    @app.errorhandler(NotFound)
+    def client_side_route(e):
+        # The React app does its own routing (e.g. /config), so a page refresh or a
+        # deep link asks the server for a path it has no file for. Serve the app shell
+        # for those. API paths and requests for files (anything with an extension)
+        # stay real 404s, as does everything when there is no build to serve.
+        last_segment = request.path.rsplit('/', 1)[-1]
+        has_build = os.path.isfile(os.path.join(app.static_folder, 'index.html'))
+        if (request.method in ('GET', 'HEAD') and has_build
+                and not request.path.startswith('/api/') and '.' not in last_segment):
+            return app.send_static_file('index.html')
+        return e
 
     @app.route('/api/graph')
     def graph():
