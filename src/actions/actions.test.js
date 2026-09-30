@@ -2,14 +2,6 @@ import configureMockStore from 'redux-mock-store';
 import { thunk } from 'redux-thunk';
 const fetchMock = global.fetch;
 
-vi.mock('react-redux-toastr', () => ({
-  toastr: {
-    error: vi.fn(),
-    removeByType: vi.fn(),
-  },
-}));
-
-import { toastr } from 'react-redux-toastr';
 import {
   getGraphData,
   getConfig,
@@ -21,6 +13,9 @@ import {
   LOAD_GRAPH_DATA_SUCCESS,
   LOAD_CONFIG_DATA_SUCCESS,
   LOAD_STATE_DATA_SUCCESS,
+  API_ERROR,
+  API_ERROR_DISMISSED,
+  dismissApiError,
 } from './actions';
 
 const mockStore = configureMockStore([thunk]);
@@ -32,8 +27,6 @@ const flushPromises = () => new Promise(resolve => setImmediate(resolve));
 
 beforeEach(() => {
   fetchMock.resetMocks();
-  toastr.error.mockClear();
-  toastr.removeByType.mockClear();
 });
 
 describe('getGraphData', () => {
@@ -73,15 +66,44 @@ describe('getConfig / getCurrentState', () => {
     ]);
   });
 
-  test('a failed fetch reports the error via toastr instead of dispatching', async () => {
+  test('an HTTP error dispatches API_ERROR instead of the success action', async () => {
     fetchMock.mockResponseOnce('', { status: 500, statusText: 'Internal Server Error' });
     const store = mockStore({});
 
     await store.dispatch(getConfig());
 
-    expect(store.getActions()).toEqual([]);
-    expect(toastr.error).toHaveBeenCalledWith(expect.stringContaining('Internal Server Error'));
+    expect(store.getActions()).toEqual([
+      { type: API_ERROR, message: 'Error calling api: Internal Server Error' },
+    ]);
   });
+
+  test('a network failure (API unreachable) dispatches API_ERROR', async () => {
+    fetchMock.mockRejectOnce(new Error('Failed to fetch'));
+    const store = mockStore({});
+
+    await store.dispatch(getCurrentState());
+
+    expect(store.getActions()).toEqual([
+      { type: API_ERROR, message: 'Error calling api: Failed to fetch' },
+    ]);
+  });
+
+  test('a failed POST dispatches API_ERROR and does not refresh state', async () => {
+    fetchMock.mockResponseOnce('', { status: 500, statusText: 'Internal Server Error' });
+    const store = mockStore({ smokerpi: { state: { blower: 0 } } });
+
+    await store.dispatch(toggleBlower());
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(store.getActions()).toEqual([
+      { type: API_ERROR, message: 'Error calling api: Internal Server Error' },
+    ]);
+  });
+});
+
+test('dismissApiError creates the dismiss action', () => {
+  expect(dismissApiError()).toEqual({ type: API_ERROR_DISMISSED });
 });
 
 describe('toggle thunks', () => {

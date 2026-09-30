@@ -25,3 +25,9 @@ test('renders the nav bar and the home page by default', () => {
   expect(screen.getByText('SmokerPi')).toBeInTheDocument();
   expect(screen.getByText('Toggle Blower')).toBeInTheDocument();
 });
+
+test('shows an error banner when the API cannot be reached', async () => {
+  fetch.mockReject(new Error('Failed to fetch'));
+  renderApp();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Error calling api: Failed to fetch');
+});

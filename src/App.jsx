@@ -1,4 +1,5 @@
 import React from 'react';
+import { Container } from 'react-bootstrap';
 import {
     BrowserRouter as Router,
     Routes,
@@ -7,12 +8,14 @@ import {
   import MyNavBar from './NavBar';
   import Home from './home';
   import Config from './config';
+  import ErrorBanner from './errorbanner';
   
   export default function App() {
     return (
       <Router>
           <MyNavBar appTitle='SmokerPi' />
         <div>  
+          <Container><ErrorBanner /></Container>
           {/* <Routes> renders the best-matching <Route> for the current URL;
               the "*" route keeps the old behaviour of showing Home for any other path. */}
           <Routes>
