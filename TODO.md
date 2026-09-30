@@ -4,8 +4,7 @@
 
 Held back at the 2026-09 dependency update because each is a migration, not a bump.
 
-- [ ] **React 18 → 19**: React 18 is done, as are Router 7 and Redux 5 / react-redux 9. 19 is still blocked by libraries whose React peer range stops at 18 or earlier: `react-redux-toastr` 8 (up to 18; consider dropping it, see the toast item below), `recharts` 1 (officially React 16 only; needs 3), and `react-bootstrap` 1 (needs 2 for 19). Do this after those items.
-- [ ] **Bootstrap / Bootswatch 4 → 5 and react-bootstrap 1 → 2**: do together; theme/CSS class changes throughout.
+- [ ] **React 18 → 19**: React 18 is done, as are Router 7, Redux 5 / react-redux 9 and Bootstrap 5 / react-bootstrap 2. 19 is still blocked by two libraries: `react-redux-toastr` 8 (supports up to React 18; consider dropping it, see the toast item below) and `recharts` 1 (officially React 16 only; needs 3). Do this after the recharts item.
 - [ ] **recharts 1 → 3** (also lets us drop the `events` polyfill added in the Vite migration — recharts 1.x imports Node's `events`): 1.x is no longer maintained (prints a deprecation notice); API changes to `LineChart` usage.
 
 ## Existing frontend issues

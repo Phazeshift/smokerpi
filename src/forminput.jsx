@@ -16,7 +16,7 @@ export const FormInput = ({
       }) => {
         
         return (
-          <Form.Group>
+          <Form.Group className="mb-3">
             <Form.Label htmlFor={name}>{label}</Form.Label>
             <Form.Control
               id={name}

@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import * as actions from './actions/actions';
-import { Container, Button, Row, Form } from 'react-bootstrap';
+import { Container, Button, Form } from 'react-bootstrap';
 import { FormInput } from './forminput'
 
 class Config extends Component {    
@@ -192,7 +192,7 @@ class Config extends Component {
               className="input"
             />
             </Form>
-            <Row><Button onClick={this.onSubmit}>Save</Button></Row>
+            <div className="mb-3"><Button onClick={this.onSubmit}>Save</Button></div>
         </Container>        
       );  
     }
