@@ -12,8 +12,13 @@ class Blower:
         self.pwmMode = False
         self.state = 0
 
-        GPIO.setmode(self.board)            # choose BCM or BOARD               
-        self.off()
+        GPIO.setmode(self.board)            # choose BCM or BOARD
+        # Both pins must be set up as outputs before anything is written to them, or
+        # RPi.GPIO raises "RuntimeError: The GPIO channel has not been set up as an OUTPUT".
+        # Start with both low, which is the blower off (state 0). (This used to happen as a
+        # side effect of off() running setNonPwm() when pwmMode started out True.)
+        GPIO.setup(self.pin1, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.setup(self.pin2, GPIO.OUT, initial=GPIO.LOW)
 
     def cleanup(self):
         '''Selective GPIO cleanup'''

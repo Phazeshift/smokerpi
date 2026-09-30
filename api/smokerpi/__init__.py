@@ -167,11 +167,38 @@ def create_app(test_config=None):
         app.smokerpi_graphIndex = app.smokerpi_graphIndex + 1
         app.smokerpi_graphLast = graphLast
 
+    def runStep(name, step):
+        try:
+            step()
+            return True
+        except Exception:
+            app.logger.exception('Worker step failed: %s', name)
+            return False
+
+    def failSafe():
+        # After a hardware or sensor error leave the blower off rather than running unsupervised.
+        try:
+            app.smokerpi_blower.off()
+        except Exception:
+            app.logger.exception('Fail-safe could not switch the blower off')
+
+    def workerStep():
+        """One pass of the control loop. It never raises.
+
+        An exception here used to kill the worker thread silently, which froze the
+        temperature reading and the PID and left the blower in whatever state it was in."""
+        sensorOk = runStep('temperature read', monitorTemp)
+        # Do not act on a reading that could not be taken.
+        controlOk = runStep('PID update', updatePid) if sensorOk else False
+        runStep('graph update', graphData)
+        if not (sensorOk and controlOk):
+            failSafe()
+
+    app.smokerpi_workerStep = workerStep
+
     def worker():
         while app.smokerpi_running:
-            monitorTemp()
-            updatePid()
-            graphData()
+            workerStep()
             time.sleep(app.smokerpi_workerInterval)
         print("Worker complete")
 
