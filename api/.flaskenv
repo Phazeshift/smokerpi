@@ -1,2 +1,1 @@
 FLASK_APP=smokerpi
-FLASK_ENV=development

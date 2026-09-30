@@ -31,6 +31,10 @@ CI (`.github/workflows/ci.yml`, Node 22 — Vitest requires 22.12+) runs both su
 
 `build/` is gitignored — it is not committed. Pushing a tag like `v1.2.3` runs `.github/workflows/release.yml`, which builds the frontend and publishes a GitHub Release containing `smokerpi.tar.gz` (built frontend + `api/smokerpi`, `runserver.py`, `requirements.txt`, the shell scripts, and a `VERSION` file). On the Pi, `sudo ./update.sh` finds the latest release, installs it over the current directory, runs `pip install` only if `requirements.txt` changed, and restarts the `smokerpiboot` init service. It preserves `api/config.json` and `api/venv`. Tag only commits that have passed CI on `master`.
 
+Production must never run in debug mode. Flask 2.0's `app.run()` loads `.flaskenv` itself and, if that sets `FLASK_ENV`, re-enables debug over `app.debug = False`, which exposed the interactive Werkzeug debugger (`/console`) on the Pi's LAN address. So `runserver.py` passes `debug=False, load_dotenv=False` explicitly and `api/.flaskenv` holds only `FLASK_APP`; `api/tests/test_deployment.py` guards both. `.flaskenv` stays in the bundle on purpose: an already-installed `update.sh` copies it unconditionally, so omitting it would abort an update after the old code was deleted. The installed `update.sh` is always the *previous* release's copy, so keep any change to what the bundle contains compatible with older `update.sh` versions.
+
+The Pi needs Python 3.9+ (the pins are Flask 3 / Werkzeug 3). `install.sh` checks this up front, and `update.sh` checks the venv's Python before running pip when `requirements.txt` changed, aborting before anything is touched.
+
 `runserver.sh` uses `exec python ...` on purpose: the init script's PID file must track python itself or a service restart leaves the old server holding the port. Shell scripts are pinned to LF via `.gitattributes`.
 
 ## Architecture
