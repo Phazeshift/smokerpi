@@ -1,11 +1,11 @@
 import configureMockStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
-import fetchMock from 'jest-fetch-mock';
+const fetchMock = global.fetch;
 
-jest.mock('react-redux-toastr', () => ({
+vi.mock('react-redux-toastr', () => ({
   toastr: {
-    error: jest.fn(),
-    removeByType: jest.fn(),
+    error: vi.fn(),
+    removeByType: vi.fn(),
   },
 }));
 

@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import * as serviceWorker from './serviceWorker';
 import { Provider } from 'react-redux'
 import configureStore from './store';
 
@@ -16,7 +15,7 @@ ReactDOM.render(
   document.getElementById('root')
 );
 
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-serviceWorker.unregister();
+// This app no longer ships a service worker; remove any left registered by an older build.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+}

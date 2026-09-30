@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SmokerPi: a Raspberry Pi app that controls a BBQ smoker's blower/damper via a PID loop and reports temperature. It's two apps in one repo, meant to be deployed together on the Pi:
 
-- `src/` — React 16 + Redux frontend (Create React App / react-scripts 3.4.1).
+- `src/` — React 16 + Redux frontend (built with Vite, tested with Vitest).
 - `api/` — Flask backend (`api/smokerpi/`) that drives the hardware and serves the built frontend as static files.
 
 On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Everywhere else (Windows/macOS dev machines, Linux CI), it runs against emulated hardware automatically — see "Hardware emulation" below. This is what makes the backend testable off-Pi at all.
@@ -15,9 +15,9 @@ On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Ev
 
 ### Frontend (run from repo root)
 - Install: `yarn install`
-- Dev server: `yarn start`
-- Tests: `yarn test --watchAll=false` (add `CI=true` to match CI exactly). Single file: `yarn test --watchAll=false src/controls.test.js`.
-- Build: `NODE_OPTIONS=--openssl-legacy-provider yarn build` — the `NODE_OPTIONS` is required on Node 17+; react-scripts 3.4.1's webpack 4 uses a hash routine OpenSSL 3 removed, and the build fails with `ERR_OSSL_EVP_UNSUPPORTED` without it.
+- Dev server: `yarn start` (Vite; proxies `/api` and `/socket.io` to the Flask backend on `localhost:5000`).
+- Tests: `yarn test` (Vitest, watch mode; `yarn vitest run` for a single run, as CI does). Single file: `yarn vitest run src/controls.test.jsx`.
+- Build: `yarn build` — outputs to `build/` (set in `vite.config.mjs`) because Flask serves `../../build` and the release workflow packages it.
 
 ### Backend (run from `api/`)
 - Install: `pip install -r requirements.txt -r requirements-dev.txt` (the `-dev` file layers `pytest`/`pytest-cov` on top).
@@ -25,7 +25,7 @@ On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Ev
 - Off-Pi and not on Windows (e.g. a Linux shell), set `SMOKERPI_TEST=1` first so the app uses emulated hardware instead of trying to talk to real GPIO/pigpio.
 - Run the server for real: `yarn start-api` from repo root (activates `api/venv` and runs `api/runserver.py`), or `yarn start-api2` for `flask run`.
 
-CI (`.github/workflows/ci.yml`) runs both suites plus a frontend build on every push/PR to `master`, including Dependabot PRs — treat a red CI run on a dependency bump as a real finding, not a fluke (see `api/requirements.txt`'s history for two examples where a Dependabot-proposed bump was incompatible with other pinned packages and CI was what caught it).
+CI (`.github/workflows/ci.yml`, Node 22 — Vitest requires 22.12+) runs both suites plus a frontend build on every push/PR to `master`, including Dependabot PRs — treat a red CI run on a dependency bump as a real finding, not a fluke (see `api/requirements.txt`'s history for two examples where a Dependabot-proposed bump was incompatible with other pinned packages and CI was what caught it).
 
 ## Deployment
 
@@ -63,9 +63,9 @@ There's a single combined reducer mounted under the `smokerpi` key (`rootReducer
 ### Testing conventions
 
 - Backend tests (`api/tests/`) use the `app`/`client` fixtures from `conftest.py`, which always build via `create_app(test_config=...)` — never rely on the module-level `app` singleton in a test, since that one starts a real worker thread. Anything touching `Config`'s disk I/O (loading/saving `config.json`) needs `monkeypatch.chdir(tmp_path)` first so it doesn't clobber the real (gitignored) `api/config.json`.
-- Frontend component tests use `renderWithStore` (`src/testUtils.js`) to wrap a component in a real Redux store + `Provider`; `fetch` is globally mocked via `jest-fetch-mock` (wired up in `src/setupTests.js`), so give it a `mockResponse`/`mockResponseOnce` before rendering anything that fetches on mount.
+- Frontend component tests use `renderWithStore` (`src/testUtils.jsx`) to wrap a component in a real Redux store + `Provider`; `fetch` is globally mocked via `vitest-fetch-mock` (wired up in `src/setupTests.js`), so give it a `mockResponse`/`mockResponseOnce` before rendering anything that fetches on mount.
 
 ### Known encoding/platform traps
 
 - `api/requirements.txt` is UTF-8-with-BOM (not plain UTF-8, not UTF-16 — it's been both at different points in this repo's history after tooling round-trips). If you edit it, verify the byte-level encoding survived (`open(path, 'rb').read()[:5]` should start `\xef\xbb\xbf`) before committing — a naive text edit through a tool that assumes ASCII/UTF-8-without-BOM can silently corrupt it, and Git will refuse to line-merge it (reports "Cannot merge binary files") if two branches touch it with different encodings.
-- Imports must match filename casing exactly — Windows/macOS filesystems are case-insensitive so a wrong-case import (e.g. `./app` for `App.js`) works locally and only breaks the production build on Linux (this happened for real; see `src/index.js`'s git history).
+- Files containing JSX must use the `.jsx` extension (Vite does not parse JSX in `.js`). Imports must match filename casing exactly — Windows/macOS filesystems are case-insensitive so a wrong-case import (e.g. `./app` for `App.js`) works locally and only breaks the production build on Linux (this happened for real; see `src/index.js`'s git history).

@@ -1,7 +1,7 @@
 import { socketMiddleware } from './socketMiddleware';
 
-jest.mock('socket.io-client', () => ({
-  connect: jest.fn(),
+vi.mock('socket.io-client', () => ({
+  default: { connect: vi.fn() },
 }));
 
 import io from 'socket.io-client';
@@ -9,10 +9,10 @@ import io from 'socket.io-client';
 function makeFakeSocket() {
   const handlers = {};
   return {
-    on: jest.fn((event, handler) => {
+    on: vi.fn((event, handler) => {
       handlers[event] = handler;
     }),
-    emit: jest.fn(),
+    emit: vi.fn(),
     trigger: (event, payload) => handlers[event] && handlers[event](payload),
   };
 }
@@ -22,7 +22,7 @@ describe('socketMiddleware', () => {
     const socket = makeFakeSocket();
     io.connect.mockReturnValue(socket);
 
-    const store = { dispatch: jest.fn() };
+    const store = { dispatch: vi.fn() };
     socketMiddleware('http://example.test')(store);
 
     expect(io.connect).toHaveBeenCalledWith('http://example.test');
@@ -38,8 +38,8 @@ describe('socketMiddleware', () => {
     const socket = makeFakeSocket();
     io.connect.mockReturnValue(socket);
 
-    const store = { dispatch: jest.fn() };
-    const next = jest.fn();
+    const store = { dispatch: vi.fn() };
+    const next = vi.fn();
     const dispatchAction = socketMiddleware('http://example.test')(store)(next);
 
     const action = { type: 'SEND_WEBSOCKET_MESSAGE', method: 'update', payload: { foo: 'bar' } };
@@ -54,8 +54,8 @@ describe('socketMiddleware', () => {
     const socket = makeFakeSocket();
     io.connect.mockReturnValue(socket);
 
-    const store = { dispatch: jest.fn() };
-    const next = jest.fn(action => action);
+    const store = { dispatch: vi.fn() };
+    const next = vi.fn(action => action);
     const dispatchAction = socketMiddleware('http://example.test')(store)(next);
 
     const action = { type: 'SOME_OTHER_ACTION' };

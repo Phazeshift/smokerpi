@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'yarn'
 
       - name: Enable Corepack (Yarn)
@@ -29,9 +29,6 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build frontend
-        # See ci.yml: webpack 4 needs the legacy OpenSSL provider on Node 17+.
-        env:
-          NODE_OPTIONS: '--openssl-legacy-provider'
         run: yarn build
 
       - name: Package bundle

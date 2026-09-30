@@ -17,7 +17,7 @@ test('renders a labelled input with the given value', () => {
 });
 
 test('calls onChange when the user types', () => {
-  const handleChange = jest.fn();
+  const handleChange = vi.fn();
   render(
     <FormInput
       label="Target temperature"
