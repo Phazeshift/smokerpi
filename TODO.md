@@ -11,10 +11,6 @@ Held back at the 2026-09 dependency update because each is a migration, not a bu
 - [ ] **redux 4 → 5, react-redux 7 → 9, redux-thunk 2 → 3**: needs React 18+; redux-thunk 3 uses a named `thunk` export instead of the default import (`src/store.js`, `src/testUtils.js`, `src/App.test.js`, `src/actions/actions.test.js`).
 - [ ] **recharts 1 → 3**: 1.x is no longer maintained (prints a deprecation notice); API changes to `LineChart` usage.
 
-## Cleanup
-
-- [ ] Remove unused `package.json` entries: `react-thunk`, `create-react-app`, and the webpack-only packages (`css-loader`, `html-loader`, `svg-inline-loader`, `html-webpack-plugin`, `babel-loader`, `@babel/*`), plus the `buildwebpack` script. Nothing in the repo has a webpack/Babel config or imports them.
-
 ## Verification
 
 - [ ] Run the updated backend (Flask 3, Werkzeug 3, Adafruit stack) on a real Pi. Only emulated hardware has been tested. Confirm the Pi's Python is 3.9+.
