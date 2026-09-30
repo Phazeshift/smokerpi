@@ -21,6 +21,7 @@ import threading
 def create_app(test_config=None):
     app = Flask(__name__, static_folder='../../build', static_url_path='/')
 
+    os.makedirs('./log', exist_ok=True)
     logging.basicConfig(filename='./log/app.log',level=logging.DEBUG)
 
     app.logger.info("### NEW STARTUP Version 0.1")
