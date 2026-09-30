@@ -1,5 +1,3 @@
-import {toastr} from "react-redux-toastr";
-
 export const LOAD_DATA_SUCCESS = "LOAD_DATA_SUCCESS";
 export const LOAD_GRAPH_DATA_SUCCESS = "LOAD_GRAPH_DATA_SUCCESS";
 export const LOAD_CONFIG_DATA_SUCCESS = "LOAD_CONFIG_DATA_SUCCESS";
@@ -7,6 +5,10 @@ export const LOAD_STATE_DATA_SUCCESS = "LOAD_STATE_DATA_SUCCESS";
 export const DATA_LOADED = "DATA_LOADED";
 export const SEND_WEBSOCKET_MESSAGE = "SEND_WEBSOCKET_MESSAGE";
 export const SOCKET_MESSAGE_RECEIVED = "SOCKET_MESSAGE_RECEIVED";
+export const API_ERROR = "API_ERROR";
+export const API_ERROR_DISMISSED = "API_ERROR_DISMISSED";
+
+export const dismissApiError = () => ({ type: API_ERROR_DISMISSED });
 
 export const getGraphData = () => (dispatch, getState) => {
     let from = getState().smokerpi.graphIndex;
@@ -40,6 +42,8 @@ export const toggleAutomatic = () => (dispatch, getState) => {
     return postApi(dispatch, `/api/pid`, { enabled: !enabled }, () => dispatch(getCurrentState()));
     }
 
+const apiError = error => ({ type: API_ERROR, message: `Error calling api: ${error.message}` });
+
 const api = (dispatch, url, action) => {       
     return fetch(url)
         .then(response => {
@@ -50,11 +54,10 @@ const api = (dispatch, url, action) => {
         })
         .then(
             data => {
-                toastr.removeByType('error');
                 dispatch({type: action, data});
             },
             error => {
-                toastr.error(`Error calling api: ${error.message}`);
+                dispatch(apiError(error));
             })
     }
 
@@ -72,11 +75,10 @@ const postApi = (dispatch, url, postData, then) => {
         })
         .then(
             data => {
-                toastr.removeByType('error');
                 then(dispatch, data);
             },
             error => {
-                toastr.error(`Error calling api: ${error.message}`);
+                dispatch(apiError(error));
             })
     }    
    

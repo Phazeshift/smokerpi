@@ -4,6 +4,8 @@ import {
   LOAD_CONFIG_DATA_SUCCESS,
   LOAD_STATE_DATA_SUCCESS,
   SOCKET_MESSAGE_RECEIVED,
+  API_ERROR,
+  API_ERROR_DISMISSED,
 } from '../actions/actions';
 
 describe('reducer', () => {
@@ -54,5 +56,34 @@ describe('reducer', () => {
     });
     expect(state.state).toEqual({ temperature: 95 });
     expect(state.graphData).toEqual([]);
+  });
+  describe('API errors', () => {
+    test('API_ERROR stores the message under state.error', () => {
+      const state = reducer(undefined, { type: API_ERROR, message: 'Error calling api: boom' });
+      expect(state.error).toBe('Error calling api: boom');
+      expect(state.graphData).toEqual([]);
+    });
+
+    test('API_ERROR_DISMISSED removes the error', () => {
+      const initial = { graphData: [], graphIndex: 0, error: 'boom' };
+      const state = reducer(initial, { type: API_ERROR_DISMISSED });
+      expect(state).toEqual({ graphData: [], graphIndex: 0 });
+      expect('error' in state).toBe(false);
+    });
+
+    test('API_ERROR_DISMISSED with no error returns the same state object', () => {
+      const initial = { graphData: [], graphIndex: 0 };
+      expect(reducer(initial, { type: API_ERROR_DISMISSED })).toBe(initial);
+    });
+
+    test.each([
+      ['LOAD_GRAPH_DATA_SUCCESS', LOAD_GRAPH_DATA_SUCCESS, []],
+      ['LOAD_CONFIG_DATA_SUCCESS', LOAD_CONFIG_DATA_SUCCESS, {}],
+      ['LOAD_STATE_DATA_SUCCESS', LOAD_STATE_DATA_SUCCESS, {}],
+    ])('%s clears a previous error', (_name, type, data) => {
+      const initial = { graphData: [], graphIndex: 0, error: 'boom' };
+      const state = reducer(initial, { type, data });
+      expect('error' in state).toBe(false);
+    });
   });
 });

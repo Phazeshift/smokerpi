@@ -731,11 +731,6 @@ estree-walker@^3.0.3:
   dependencies:
     "@types/estree" "^1.0.0"
 
-eventemitter3@^3.1.2:
-  version "3.1.2"
-  resolved "https://registry.yarnpkg.com/eventemitter3/-/eventemitter3-3.1.2.tgz#2d3d48f9c346698fce83a85d7d664e98535df6e7"
-  integrity sha512-tvtQIeLVHjDkJYnzf2dgVMxfuSGJeM/7UCG17TT4EumTfNtF+0nebF/4zWOIkCreAbtNqhGEboB6BWrwqNaw4Q==
-
 eventemitter3@^5.0.1:
   version "5.0.4"
   resolved "https://registry.yarnpkg.com/eventemitter3/-/eventemitter3-5.0.4.tgz#a86d66170433712dde814707ac52b5271ceb1feb"
@@ -1081,14 +1076,6 @@ react-lifecycles-compat@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz#4f1a273afdfc8f3488a8c516bfda78f872352362"
   integrity sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA==
-
-react-redux-toastr@^8.0.0:
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/react-redux-toastr/-/react-redux-toastr-8.0.0.tgz#bb6379e06289e6521cc9e03d277c38acc50d183c"
-  integrity sha512-rB/T25Gu3XLYB11hr0YL0IsyekXA0fTFkw+i1+2vTtdwp+GLL7EvwtovGvJHvoxm9oRvipg+CzAVK2/8gelSzw==
-  dependencies:
-    classnames "^2.3.2"
-    eventemitter3 "^3.1.2"
 
 "react-redux@8.x.x || 9.x.x", react-redux@^9.3.0:
   version "9.3.0"
