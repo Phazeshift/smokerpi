@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SmokerPi: a Raspberry Pi app that controls a BBQ smoker's blower/damper via a PID loop and reports temperature. It's two apps in one repo, meant to be deployed together on the Pi:
 
-- `src/` — React 16 + Redux frontend (built with Vite, tested with Vitest).
+- `src/` — React 18 + Redux frontend (built with Vite, tested with Vitest).
 - `api/` — Flask backend (`api/smokerpi/`) that drives the hardware and serves the built frontend as static files.
 
 On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Everywhere else (Windows/macOS dev machines, Linux CI), it runs against emulated hardware automatically — see "Hardware emulation" below. This is what makes the backend testable off-Pi at all.
