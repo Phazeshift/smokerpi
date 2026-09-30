@@ -9,7 +9,7 @@ class Damper:
         self.min = min
         self.max = max
         self.pi = pigpio.pi() 
-        self.pin = 13
+        self.pin = pin
         self.state = -1
         self.open(100)
 
