@@ -35,7 +35,6 @@ The wiring and settings of the smoker's Pi, as reported by the running app (`/ap
 | `set_temperature` | 105 | 105 | Target pit temperature in degrees Celsius (the PID setpoint). |
 | `damper_minimum` | 500 | 500 | Servo pulse width in microseconds with the damper closed (0%). |
 | `damper_maximum` | **1500** | 2500 | Servo pulse width in microseconds with the damper fully open (100%). **The only value that differs from the default**: it limits the servo's travel to 500-1500 us. |
-| `blower_minimum` | 40 | 40 | Saved and editable, but not currently used by the control loop. |
 | `worker_interval` | 10 | 10 | Seconds between thermocouple reads / PID updates. |
 | `graph_interval` | 10 | 10 | Minimum seconds between graph points (the last 2000 are kept). |
 | `cs_pin`, `clock_pin`, `data_pin`, `blower_pin1`, `blower_pin2`, `damper_pin` | see the table above | same | Pins. |
@@ -50,5 +49,6 @@ The settings live in `api/config.json` in the install directory. It is created w
 
 (The running app reported every other value equal to the default. If you change the target temperature on the Config page it is saved into this file too.)
 
-- **Changing settings:** the four editable settings (`set_temperature`, `blower_minimum`, `damper_minimum`, `damper_maximum`) can be changed on the Config page and apply immediately. Pins and intervals are read-only there because they only take effect at startup: edit `config.json` on the Pi and restart with `sudo service smokerpiboot restart`.
+- **Changing settings:** the three editable settings (`set_temperature`, `damper_minimum`, `damper_maximum`) can be changed on the Config page and apply immediately. Pins and intervals are read-only there because they only take effect at startup: edit `config.json` on the Pi and restart with `sudo service smokerpiboot restart`.
+- **`blower_minimum`** used to be a setting but the control loop stopped reading it when the damper was added (the blower is simply on when the PID output is above 99, otherwise off), so it was removed. An old `config.json` that still contains it is fine: it is ignored.
 - **Before reinstalling the OS**, back the file up, e.g. `cp api/config.json ~/smokerpi-config.json`, and copy it back into `api/` before the first start. Otherwise the defaults are used, and with them a fully open servo range of 500-2500 us instead of 500-1500 us.
