@@ -2,9 +2,7 @@
 
 ## Dependency migrations
 
-Held back at the 2026-09 dependency update because each is a migration, not a bump.
-
-- [ ] **React 18 → 19**: nothing blocks it any more (Router 7, Redux 5 / react-redux 9, Bootstrap 5 / react-bootstrap 2, recharts 3 all support 19, and `react-redux-toastr` is gone). Upgrade `react`, `react-dom` and `react-is`, then re-check `@testing-library/react` and re-test in a browser.
+All planned migrations are done (2026-09-30): Vite/Vitest, React 19, Router 7, Redux 5, Bootstrap 5, recharts 3.
 
 ## Existing frontend issues
 
