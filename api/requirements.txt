@@ -21,7 +21,7 @@ pigpio==1.78
 pip-review==1.1.0
 pycparser==2.21
 pyftdi==0.53.3
-pyparsing==3.0.6
+pyparsing==2.4.7
 pyserial==3.5
 python-dotenv==0.19.2
 python-engineio==4.3.0

@@ -28,3 +28,5 @@ __pycache__
 *.log*
 *.pyc
 config.json
+
+.vs
