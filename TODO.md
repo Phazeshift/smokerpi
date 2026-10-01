@@ -23,7 +23,7 @@ Last updated 2026-10-01, after release v0.3.2.
 - [ ] **`install.sh` robustness** (found when a venv restored from the old Pi broke the install). After enabling boot start, offer to start the service now: it only registers it, so the app stayed down. Recreate a stale venv (`python3 -m venv --clear venv`) instead of reusing one from an old install. Stop with a clear message when the pip step fails, instead of carrying on and offering to enable a service that cannot start.
 - [x] **Show worker failures in the UI.** Done: `/api/state` has `workerError` (failed steps, or a stopped loop via a watchdog) and the status card shows it. The UI polls every 30s, so it can take that long to appear.
 - [x] **The app log is bounded.** Done: `configureLogging()` in `api/smokerpi/__init__.py` writes `log/app.log` through a `RotatingFileHandler` (1 MB x 3 backups) at INFO.
-- [ ] **Test isolation.** `TestConfigEndpoint::test_post_updates_config_and_dependent_hardware` (`api/tests/test_api.py`) saves into the real `api/config.json`, because only one test in that file changes into a temp directory and `conftest.py` does not. Add an autouse fixture in `conftest.py` that chdirs to `tmp_path`. Until then, running the tests overwrites a developer's local config.
+- [x] **Test isolation.** Done: an autouse fixture in `api/tests/conftest.py` runs every test in a temp directory, so tests no longer write the real `api/config.json` or `api/log/`; `api/tests/test_isolation.py` guards it.
 
 ## Ideas (not decided)
 
