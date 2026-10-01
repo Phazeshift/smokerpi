@@ -22,3 +22,11 @@ test('renders the status card, controls and graph together', () => {
   expect(screen.getByText('90°C')).toBeInTheDocument();
   expect(screen.getByText('Toggle Blower')).toBeInTheDocument();
 });
+
+test('offers the session history as a CSV download', () => {
+  renderWithStore(<Home />, { preloadedState: { smokerpi: { graphData: [], graphIndex: 0, state: {} } } });
+
+  const link = screen.getByRole('link', { name: /download history/i });
+  expect(link).toHaveAttribute('href', '/api/history.csv');
+  expect(link).toHaveAttribute('download');
+});

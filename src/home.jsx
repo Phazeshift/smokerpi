@@ -28,6 +28,9 @@ class Home extends Component {
           <Card>
             <Card.Body>
               <Graph />
+              <div className="mt-2 text-end">
+                <a href="/api/history.csv" download="smokerpi-history.csv">Download history (CSV)</a>
+              </div>
             </Card.Body>
           </Card>
         </div>

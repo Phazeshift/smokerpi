@@ -102,6 +102,19 @@ class TestNormalUpdate:
         assert read(inst / 'api' / 'config.json') == '{"damper_maximum": 1500}'
         assert 'FLASK_ENV' not in read(inst / 'api' / '.flaskenv')
 
+    def test_keeps_the_session_history_and_the_log(self, tmp_path):
+        # api/data/history.csv is the graph history (smokerpi/history.py): an update that
+        # replaced only build/ and api/smokerpi must leave it, and the log, alone.
+        inst = make_install(tmp_path)
+        write(str(inst / 'api' / 'data' / 'history.csv'), 'time,temperature,blower,damper,target')
+        write(str(inst / 'api' / 'log' / 'app.log'), 'a log line')
+
+        result = run_update(tmp_path, inst, make_bundle(tmp_path))
+
+        assert result.returncode == 0, result.stdout
+        assert read(inst / 'api' / 'data' / 'history.csv') == 'time,temperature,blower,damper,target'
+        assert read(inst / 'api' / 'log' / 'app.log') == 'a log line'
+
     def test_does_nothing_when_already_up_to_date(self, tmp_path):
         inst = make_install(tmp_path)
         write(str(inst / 'VERSION'), 'v9.9.9\n')
