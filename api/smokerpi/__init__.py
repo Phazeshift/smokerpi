@@ -8,7 +8,7 @@ from .hardware.damper2 import Damper, TestDamper
 from .hardware.pitcontroller import PitController
 from .hardware.max31855 import MAX31855, TestMAX31855, MAX31855Error
 from .config import Config, validateEditableConfig
-from simple_pid import PID
+from .pid import AntiWindupPID
 from datetime import datetime
 import array
 import platform
@@ -51,7 +51,7 @@ def create_app(test_config=None):
     app.smokerpi_pidRunning = False
     app.smokerpi_workerInterval = 10
     app.smokerpi_graphLast = 0
-    app.smokerpi_pid = PID(1, 0.1, 0.05, setpoint=100)
+    app.smokerpi_pid = AntiWindupPID(1, 0.1, 0.05, setpoint=100)
     app.smokerpi_pid.sample_time = 0.1
     app.smokerpi_pid.output_limits = (0, 100)
 
@@ -71,6 +71,7 @@ def create_app(test_config=None):
             app.smokerpi_damper = Damper(app.smokerpi_config['damper_pin'], app.smokerpi_config['damper_minimum'], app.smokerpi_config['damper_maximum'])
         app.smokerpi_blower = Blower(app.smokerpi_config['blower_pin1'], app.smokerpi_config['blower_pin2'])
         app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
+        app.smokerpi_pid.tunings = (float(app.smokerpi_config['pid_kp']), float(app.smokerpi_config['pid_ki']), float(app.smokerpi_config['pid_kd']))
         app.smokerpi_pitController = PitController(app.smokerpi_blower, app.smokerpi_damper)
         if (app.smokerpi_test):
             app.smokerpi_max31855 = TestMAX31855(app.smokerpi_damper)

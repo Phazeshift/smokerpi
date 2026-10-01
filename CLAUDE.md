@@ -60,6 +60,10 @@ Test/emulated mode is selected once, in `create_app()`: `app.smokerpi_test = pla
 
 `hardware/damper.py` (singular) is legacy/dead code using the Adafruit CircuitPython stack — nothing imports it; `hardware/__init__.py` is empty. Don't confuse it with the actually-used `damper2.py`.
 
+### PID
+
+`app.smokerpi_pid` is an `AntiWindupPID` (`api/smokerpi/pid.py`, a `simple_pid.PID` subclass): the integral is rolled back in any step that leaves the output saturated in the direction of the error, which plain `simple_pid` does not do (it only clamps the integral to the output range). Gains come from `pid_kp`/`pid_ki`/`pid_kd` in config, applied in `configure()` at startup; they are not API-editable. The blower only turns on above output 99, which with the default Kp of 1 used to be reached through windup alone; see TODO.md before changing the gains or that threshold.
+
 ### Password
 
 `password` in `config.json` (default empty = off, so an update never locks the owner out; the startup log warns when it is off) turns on HTTP Basic auth for every request via a `before_request` hook in `create_app()`: any username, constant-time comparison. It covers the static frontend and unknown paths too. `publicConfig()` strips it from every API response and it is not in `EDITABLE_FIELDS`. The control endpoints validate `enabled` (must be a JSON boolean, else 400) before touching the PID or hardware. `api/tests/test_auth.py` covers it.
