@@ -8,10 +8,20 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 os.environ.setdefault('SMOKERPI_TEST', '1')
 
+import tempfile
+
 import pytest
 
-from smokerpi import create_app
-from smokerpi.config import Config
+# Importing smokerpi creates the module-level `app`, a real app whose worker thread keeps
+# running (and writing its graph history) for the whole test run. Import it from a scratch
+# directory so what it writes is not left in the real api/ directory.
+_real_cwd = os.getcwd()
+os.chdir(tempfile.mkdtemp(prefix='smokerpi-import-'))
+try:
+    from smokerpi import create_app
+    from smokerpi.config import Config
+finally:
+    os.chdir(_real_cwd)
 
 
 def default_config():

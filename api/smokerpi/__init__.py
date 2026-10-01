@@ -91,11 +91,11 @@ def create_app(test_config=None):
         app.smokerpi_workerInterval = app.smokerpi_config['worker_interval']
         configure()
         # The graph survives a restart: its points are kept in data/history.csv (next to config.json
-        # and log/, which update.sh leaves alone), and the newest are loaded back here.
+        # and log/, which update.sh leaves alone), and the newest are loaded back here, keeping their point numbers so the numbering carries on.
         app.smokerpi_history = History(os.path.join('data', 'history.csv'),
                                        int(float(app.smokerpi_config.get('history_max_mb', 5)) * 1024 * 1024))
         app.smokerpi_graphData = app.smokerpi_history.recent(GRAPH_POINTS)
-        app.smokerpi_graphIndex = len(app.smokerpi_graphData)
+        app.smokerpi_graphIndex = app.smokerpi_graphData[-1]['i'] + 1 if app.smokerpi_graphData else 0
         if test_config is None or test_config.get('start_worker', True):
             app.worker = threading.Thread(target=worker)
             app.worker.daemon = True
@@ -281,7 +281,7 @@ def create_app(test_config=None):
         app.smokerpi_graphIndex = app.smokerpi_graphIndex + 1
         app.smokerpi_graphLast = graphLast
         # Never raises: a disk problem is logged and must not touch the control loop.
-        app.smokerpi_history.append(now, point['t'], point['b'], point['d'], point['s'])
+        app.smokerpi_history.append(point['i'], now, point['t'], point['b'], point['d'], point['s'])
 
     def runStep(name, step):
         try:

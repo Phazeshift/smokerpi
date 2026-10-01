@@ -13,7 +13,7 @@ from smokerpi import create_app
 from smokerpi.config import Config
 from smokerpi.history import History
 
-HEADER = 'time,temperature,blower,damper,target'
+HEADER = 'point,time,temperature,blower,damper,target'
 
 
 @pytest.fixture
@@ -27,18 +27,18 @@ def when(n):
 
 def fill(history, count, start=0):
     for n in range(start, start + count):
-        history.append(datetime(2026, 10, 1, 12, (n // 60) % 60, n % 60), 100 + n, 0, 99, 105)
+        history.append(n, datetime(2026, 10, 1, 12, (n // 60) % 60, n % 60), 100 + n, 0, 99, 105)
 
 
 class TestFile:
     def test_the_first_point_creates_the_directory_and_the_header(self, path):
-        History(path).append(when(1), 26.75, 0, 99, 105)
+        History(path).append(0, when(1), 26.75, 0, 99, 105)
         lines = path.read_text().splitlines()
-        assert lines == [HEADER, '2026-10-01 12:00:01,26.75,0,99,105']
+        assert lines == [HEADER, '0,2026-10-01 12:00:01,26.75,0,99,105']
 
     def test_the_header_is_written_once_across_restarts(self, path):
-        History(path).append(when(1), 26.75, 0, 99, 105)
-        History(path).append(when(2), 27.0, 100, 100, 105)
+        History(path).append(0, when(1), 26.75, 0, 99, 105)
+        History(path).append(1, when(2), 27.0, 100, 100, 105)
         assert path.read_text().splitlines().count(HEADER) == 1
         assert len(path.read_text().splitlines()) == 3
 
@@ -58,16 +58,16 @@ class TestFile:
 
 
 class TestRecent:
-    def test_returns_graph_points_in_order_with_sequential_indexes(self, path):
+    def test_returns_graph_points_in_order_with_the_indexes_they_were_written_with(self, path):
         history = History(path)
-        history.append(when(1), 26.75, 0, 99, 105)
-        history.append(when(2), 27.0, 100, 52.33, 105)
+        history.append(7000, when(1), 26.75, 0, 99, 105)
+        history.append(7001, when(2), 27.0, 100, 52.33, 105)
 
         points = History(path).recent(10)
 
         assert points == [
-            {'i': 0, 'x': '01/10/2026 12:00:01', 't': 26.75, 'b': 0, 'd': 99, 's': 105},
-            {'i': 1, 'x': '01/10/2026 12:00:02', 't': 27.0, 'b': 100, 'd': 52.33, 's': 105},
+            {'i': 7000, 'x': '01/10/2026 12:00:01', 't': 26.75, 'b': 0, 'd': 99, 's': 105},
+            {'i': 7001, 'x': '01/10/2026 12:00:02', 't': 27.0, 'b': 100, 'd': 52.33, 's': 105},
         ]
 
     def test_returns_only_the_newest_ones(self, path):
@@ -75,7 +75,7 @@ class TestRecent:
         fill(history, 50)
         points = history.recent(10)
         assert [p['t'] for p in points] == [140 + n for n in range(10)]
-        assert [p['i'] for p in points] == list(range(10))
+        assert [p['i'] for p in points] == list(range(40, 50))
 
     def test_no_file_means_no_points(self, path):
         assert History(path).recent(10) == []
@@ -88,13 +88,14 @@ class TestRecent:
         fill(history, 2, start=100)
         points = History(path).recent(100)
         assert [p['t'] for p in points] == [100, 101, 102, 200, 201]
+        assert [p['i'] for p in points] == [0, 1, 2, 100, 101]
 
     def test_a_line_cut_off_by_a_power_loss_does_not_corrupt_the_next_one(self, path):
         history = History(path)
         fill(history, 2)
         with path.open('a') as f:
             f.write('2026-10-01 12:30:00,50.')          # power lost mid-write, no newline
-        History(path).append(when(59), 77.0, 0, 99, 105)
+        History(path).append(2, when(59), 77.0, 0, 99, 105)
         points = History(path).recent(100)
         assert [p['t'] for p in points] == [100, 101, 77.0]
 
@@ -123,7 +124,7 @@ class TestSizeLimit:
     def test_appending_still_works_after_a_trim(self, path):
         history = History(path, max_bytes=2000)
         fill(history, 300)
-        history.append(when(59), 555.0, 0, 99, 105)
+        history.append(300, when(59), 555.0, 0, 99, 105)
         assert history.recent(1)[0]['t'] == 555.0
 
 
@@ -132,7 +133,7 @@ class TestFailures:
         blocked = tmp_path / 'blocked'
         blocked.write_text('a file where the directory should be')
         history = History(blocked / 'history.csv')
-        history.append(when(1), 26.75, 0, 99, 105)        # must not raise
+        history.append(0, when(1), 26.75, 0, 99, 105)        # must not raise
         assert 'history' in caplog.text.lower()
 
     def test_a_read_error_gives_no_points(self, tmp_path):
@@ -178,6 +179,26 @@ class TestInTheApp:
         finally:
             restarted.smokerpi_running = False
 
+    def test_a_browser_that_had_seen_thousands_of_points_still_gets_new_ones_after_a_restart(self, app):
+        # point numbers used to restart from 0, which left an open tab (asking from its own
+        # last number) waiting for hours. They now carry on from where the file left off.
+        app.smokerpi_graphIndex = 7000
+        for _ in range(3):
+            app.smokerpi_graphLast = 0
+            app.smokerpi_workerStep()
+        app.smokerpi_running = False
+
+        restarted = make_app()
+        try:
+            restarted.smokerpi_workerStep()
+            tab_is_at = 7003                      # the tab has seen points 7000-7002
+            newer = json.loads(restarted.test_client().get('/api/graph?from=%d' % tab_is_at).data)
+            assert [p['i'] for p in newer] == [7003]
+            everything = json.loads(restarted.test_client().get('/api/graph?from=0').data)
+            assert [p['i'] for p in everything] == [7000, 7001, 7002, 7003]
+        finally:
+            restarted.smokerpi_running = False
+
     def test_only_the_most_recent_two_thousand_points_are_restored(self, app):
         fill(app.smokerpi_history, 2500)
         app.smokerpi_running = False
@@ -186,6 +207,7 @@ class TestInTheApp:
             graph = json.loads(restarted.test_client().get('/api/graph').data)
             assert len(graph) == 2000
             assert graph[-1]['t'] == 100 + 2499
+            assert (graph[0]['i'], graph[-1]['i']) == (500, 2499)
         finally:
             restarted.smokerpi_running = False
 
@@ -238,3 +260,19 @@ class TestDownload:
             assert client.get('/api/history.csv', headers={'Authorization': 'Basic ' + token}).status_code == 200
         finally:
             application.smokerpi_running = False
+
+
+def test_the_path_is_fixed_when_created_so_a_later_directory_change_does_not_move_it(tmp_path, monkeypatch):
+    # the worker thread keeps appending for the life of the process; a relative path would
+    # follow the current directory around
+    first, second = tmp_path / 'first', tmp_path / 'second'
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.chdir(first)
+    history = History('data/history.csv')
+    monkeypatch.chdir(second)
+
+    history.append(0, when(1), 26.75, 0, 99, 105)
+
+    assert (first / 'data' / 'history.csv').exists()
+    assert not (second / 'data').exists()

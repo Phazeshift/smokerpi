@@ -7,7 +7,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-HEADER = 'time,temperature,blower,damper,target'
+HEADER = 'point,time,temperature,blower,damper,target'
 FILE_TIME = '%Y-%m-%d %H:%M:%S'      # what the CSV holds: sortable and understood by spreadsheets
 GRAPH_TIME = '%d/%m/%Y %H:%M:%S'     # what the graph points have always used
 
@@ -28,12 +28,14 @@ class History:
     raises: a disk problem is logged and the control loop carries on."""
 
     def __init__(self, path, max_bytes=5 * 1024 * 1024):
-        self.path = Path(path)
+        # Fixed now, not looked up from the current directory at each write: the worker thread
+        # keeps appending for the life of the process.
+        self.path = Path(os.path.abspath(path))
         self.max_bytes = max_bytes
         self._lock = threading.Lock()
 
-    def append(self, when, temperature, blower, damper, target):
-        line = '%s,%s,%s,%s,%s\n' % (when.strftime(FILE_TIME), temperature, blower, damper, target)
+    def append(self, index, when, temperature, blower, damper, target):
+        line = '%s,%s,%s,%s,%s,%s\n' % (index, when.strftime(FILE_TIME), temperature, blower, damper, target)
         try:
             with self._lock:
                 self._prepare()
@@ -45,8 +47,10 @@ class History:
             log.exception('Could not write the history file %s', self.path)
 
     def recent(self, count):
-        """The newest `count` points as graph points ({'i', 'x', 't', 'b', 'd', 's'}), numbered
-        from 0."""
+        """The newest `count` points as graph points ({'i', 'x', 't', 'b', 'd', 's'}), with the
+        point numbers they were written with. Those only ever go up, across restarts too: the
+        browser asks for points from the last number it saw, so numbering from 0 again would
+        leave an open tab waiting for hours."""
         try:
             with self._lock:
                 with open(self.path, encoding='utf-8', errors='replace', newline='') as history:
@@ -61,10 +65,7 @@ class History:
             point = self._parse(line)
             if point is not None:
                 points.append(point)
-        points = points[-count:] if count > 0 else []
-        for index, point in enumerate(points):
-            point['i'] = index
-        return points
+        return points[-count:] if count > 0 else []
 
     def read_all(self):
         """The whole file, for download. Just the header if there is none yet."""
@@ -80,14 +81,15 @@ class History:
     @staticmethod
     def _parse(line):
         fields = line.split(',')
-        if len(fields) != 5:
+        if len(fields) != 6:
             return None
         try:
-            when = datetime.strptime(fields[0], FILE_TIME)
-            temperature, blower, damper, target = (_number(field) for field in fields[1:])
+            index = int(fields[0])
+            when = datetime.strptime(fields[1], FILE_TIME)
+            temperature, blower, damper, target = (_number(field) for field in fields[2:])
         except ValueError:
             return None
-        return {'i': 0, 'x': when.strftime(GRAPH_TIME), 't': temperature, 'b': blower, 'd': damper, 's': target}
+        return {'i': index, 'x': when.strftime(GRAPH_TIME), 't': temperature, 'b': blower, 'd': damper, 's': target}
 
     def _prepare(self):
         """Make sure the file exists with its header and ends at a line boundary (a power
