@@ -172,3 +172,61 @@ class TestReconnecting:
         damper.open(40)
         assert len(daemon.connections) == 1
 
+
+
+class TestInvert:
+    """Some linkages open the damper at the smaller pulse width. With invert, position 100
+    (open) is sent as damper_minimum and 0 (closed) as damper_maximum, so everything above
+    the Damper (the PID, the API, the UI) keeps meaning 100 = open."""
+
+    def test_the_position_is_mirrored_onto_the_pulse_width_range(self, fake_pi):
+        damper = Damper(pin=13, min=600, max=2400, invert=True)
+        fake_pi.pulses.clear()
+        for position, expected in [(0, 2400), (50, 1500), (100, 600)]:
+            damper.open(position)
+            assert fake_pi.pulses[-2] == (13, expected)
+
+    def test_not_inverted_by_default(self, fake_pi):
+        damper = Damper(pin=13, min=600, max=2400)
+        assert damper.invert is False
+
+    def test_the_constructor_still_opens_it_fully(self, fake_pi):
+        Damper(pin=13, min=500, max=1500, invert=True)
+        assert fake_pi.pulses[0] == (13, 500)
+
+    def test_the_reported_position_is_not_mirrored(self, fake_pi):
+        damper = Damper(pin=13, invert=True)
+        damper.open(30)
+        assert damper.state == 30
+
+    def test_reposition_sends_the_current_position_with_the_new_mapping(self, fake_pi):
+        damper = Damper(pin=13, min=600, max=2400)
+        damper.open(20)
+        fake_pi.pulses.clear()
+
+        damper.invert = True
+        damper.reposition()
+
+        assert fake_pi.pulses[0] == (13, 600 + (1800 / 100) * 80)
+        assert damper.state == 20
+
+    def test_a_failed_reposition_leaves_the_position_unknown_so_the_next_move_is_sent(self, daemon):
+        damper = Damper(pin=13)
+        damper.open(20)
+        daemon.restart()
+        damper.invert = True
+        with pytest.raises(OSError):
+            damper.reposition()
+        assert damper.state == -1
+
+        damper.open(20)                      # the same position as before: must still move
+
+        assert damper.state == 20
+        assert daemon.connections[-1].pulses[0][1] == 500 + (2000 / 100) * 80
+
+    def test_the_emulator_accepts_invert_and_reposition(self):
+        damper = TestDamper()
+        damper.invert = True
+        damper.open(40)
+        damper.reposition()
+        assert damper.state == 40

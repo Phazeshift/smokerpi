@@ -67,8 +67,9 @@ def create_app(test_config=None):
     def configure():
         if (app.smokerpi_test):
             app.smokerpi_damper = TestDamper()
+            app.smokerpi_damper.invert = bool(app.smokerpi_config.get('damper_invert', False))
         else:
-            app.smokerpi_damper = Damper(app.smokerpi_config['damper_pin'], app.smokerpi_config['damper_minimum'], app.smokerpi_config['damper_maximum'])
+            app.smokerpi_damper = Damper(app.smokerpi_config['damper_pin'], app.smokerpi_config['damper_minimum'], app.smokerpi_config['damper_maximum'], bool(app.smokerpi_config.get('damper_invert', False)))
         app.smokerpi_blower = Blower(app.smokerpi_config['blower_pin1'], app.smokerpi_config['blower_pin2'])
         app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
         app.smokerpi_pid.tunings = (float(app.smokerpi_config['pid_kp']), float(app.smokerpi_config['pid_ki']), float(app.smokerpi_config['pid_kd']))
@@ -181,7 +182,18 @@ def create_app(test_config=None):
             app.smokerpi_pid.tunings = (app.smokerpi_config['pid_kp'], app.smokerpi_config['pid_ki'], app.smokerpi_config['pid_kd'])
             app.smokerpi_damper.min = app.smokerpi_config['damper_minimum']
             app.smokerpi_damper.max = app.smokerpi_config['damper_maximum']
+            invert = bool(app.smokerpi_config.get('damper_invert', False))
+            invertChanged = app.smokerpi_damper.invert != invert
+            app.smokerpi_damper.invert = invert
             Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
+            if invertChanged:
+                # Move the damper to the mirrored position now; the PID would not re-send an
+                # unchanged position. The setting is kept either way.
+                try:
+                    app.smokerpi_damper.reposition()
+                except Exception as e:
+                    app.logger.exception('Could not move the damper after changing damper_invert')
+                    return jsonify(error='Saved, but the damper could not be moved to match: %s' % e), 500
         return json.dumps(publicConfig())
 
     @app.route('/api/blower', methods = ['POST'])

@@ -66,8 +66,9 @@ class Config extends Component {
       };
 
     handleChange = event => {
-        const { name, value } = event.target;
-        this.setState(({ config }) => ({ config: { ...config, [name]: value } }));
+        const { name, value, type, checked } = event.target;
+        const newValue = type === 'checkbox' ? checked : value;
+        this.setState(({ config }) => ({ config: { ...config, [name]: newValue } }));
       };
 
     componentDidMount() {
@@ -95,6 +96,9 @@ class Config extends Component {
           const editable = {};
           EDITABLE_FIELDS.forEach(({ name }) => { editable[name] = config[name]; });
           pidFieldsIn(config).forEach(({ name }) => { editable[name] = config[name]; });
+          if (config.damper_invert !== undefined) {
+            editable.damper_invert = !!config.damper_invert;
+          }
           this.props.updateConfig(editable);
         }
       };
@@ -132,6 +136,22 @@ class Config extends Component {
             <h2>Config</h2>
             <Form>
               {this.renderFields(EDITABLE_FIELDS)}
+              {this.state.config.damper_invert !== undefined && (
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    id="damper_invert"
+                    name="damper_invert"
+                    label="Invert damper"
+                    checked={!!this.state.config.damper_invert}
+                    onChange={this.handleChange}
+                  />
+                  <Form.Text className="text-muted">
+                    Tick this if your damper opens at the smaller pulse width (Damper min) instead of the
+                    larger one. Saving moves the damper to match.
+                  </Form.Text>
+                </Form.Group>
+              )}
               {pidFieldsIn(this.state.config).length > 0 && (
                 <>
                   <h5 className="mt-4">PID tuning</h5>

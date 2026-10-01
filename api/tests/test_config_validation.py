@@ -183,3 +183,85 @@ class TestPidGains:
     def test_zero_is_allowed(self, client, app):
         assert client.post('/api/config', json=valid_payload(pid_kp=0, pid_ki=0, pid_kd=0)).status_code == 200
         assert app.smokerpi_pid.tunings == (0, 0, 0)
+
+
+class FakeDamper:
+    def __init__(self, fail=False):
+        self.invert = False
+        self.min, self.max = 500, 2500
+        self.state = 99
+        self.repositioned = 0
+        self.fail = fail
+
+    def reposition(self):
+        self.repositioned += 1
+        if self.fail:
+            raise OSError('pigpiod is down')
+
+    def open(self, value):
+        self.state = value
+
+
+class TestDamperInvert:
+    """damper_invert is optional in a POST (older clients do not send it), applies at once and
+    moves the physical damper so it matches the new mapping."""
+
+    def test_the_default_is_not_inverted(self, client, app):
+        assert current_config(client)['damper_invert'] is False
+        assert app.smokerpi_damper.invert is False
+
+    def test_setting_it_applies_saves_and_returns_it(self, client, app, tmp_path):
+        response = client.post('/api/config', json=valid_payload(damper_invert=True))
+        assert response.status_code == 200
+        assert json.loads(response.data)['damper_invert'] is True
+        assert app.smokerpi_damper.invert is True
+        assert json.loads((tmp_path / 'config.json').read_text())['damper_invert'] is True
+
+    def test_it_can_be_turned_off_again(self, client, app):
+        client.post('/api/config', json=valid_payload(damper_invert=True))
+        client.post('/api/config', json=valid_payload(damper_invert=False))
+        assert app.smokerpi_damper.invert is False
+
+    def test_omitting_it_leaves_it_alone(self, client, app):
+        client.post('/api/config', json=valid_payload(damper_invert=True))
+        client.post('/api/config', json=valid_payload())
+        assert app.smokerpi_damper.invert is True
+
+    @pytest.mark.parametrize('value', ['yes', 'true', 1, 0, None, [True]])
+    def test_anything_but_a_boolean_is_a_400_and_changes_nothing(self, client, app, value):
+        before = current_config(client)
+        response = client.post('/api/config', json=valid_payload(damper_invert=value))
+        assert response.status_code == 400
+        assert 'damper_invert' in json.loads(response.data)['errors']
+        assert current_config(client) == before
+        assert app.smokerpi_damper.invert is False
+
+    def test_changing_it_moves_the_damper_to_match(self, client, app):
+        app.smokerpi_damper = FakeDamper()
+        client.post('/api/config', json=valid_payload(damper_invert=True))
+        assert app.smokerpi_damper.repositioned == 1
+
+    def test_posting_the_same_value_does_not_move_the_damper(self, client, app):
+        app.smokerpi_damper = FakeDamper()
+        client.post('/api/config', json=valid_payload(damper_invert=False))
+        client.post('/api/config', json=valid_payload())
+        assert app.smokerpi_damper.repositioned == 0
+
+    def test_a_failed_move_is_reported_but_the_setting_is_kept(self, client, app, tmp_path):
+        app.smokerpi_damper = FakeDamper(fail=True)
+        response = client.post('/api/config', json=valid_payload(damper_invert=True))
+        assert response.status_code == 500
+        assert 'damper' in json.loads(response.data)['error'].lower()
+        assert 'pigpiod is down' in json.loads(response.data)['error']
+        assert current_config(client)['damper_invert'] is True
+        assert json.loads((tmp_path / 'config.json').read_text())['damper_invert'] is True
+
+    def test_the_app_starts_with_the_configured_setting(self):
+        from smokerpi import create_app
+        from smokerpi.config import Config
+        config = dict(Config(test=True).defaultConfig(), damper_invert=True)
+        app = create_app(test_config={'config': config, 'start_worker': False})
+        try:
+            assert app.smokerpi_damper.invert is True
+        finally:
+            app.smokerpi_running = False
