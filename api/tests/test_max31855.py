@@ -105,3 +105,82 @@ class TestEmulatedThermocouple:
         pit.state = 0
         assert fake.get() == 21.0  # 23 - 2 + 0
         assert fake.get() == 20  # 21 - 2 + 0, clamped to the 20 floor
+
+
+def word(celsius, rj=25.0):
+    """A well-formed 32-bit MAX31855 word: thermocouple in D31-D18, junction in D15-D4."""
+    return ((int(round(celsius * 4)) & 0x3FFF) << 18) | ((int(round(rj * 16)) & 0xFFF) << 4)
+
+
+def slipped(data):
+    """The word as read when the bit-banged read is one bit early: everything doubles."""
+    return (data << 1) & 0xFFFFFFFF
+
+
+def scripted_reader(*words, units='c'):
+    """A reader whose read() returns the given words in turn (no GPIO touched)."""
+    reader = MAX31855.__new__(MAX31855)
+    reader.units = units
+    reader.reads = 0
+    queue = list(words)
+
+    def read():
+        reader.reads += 1
+        if not queue:
+            raise AssertionError('read more often than the test expected')
+        reader.data = queue.pop(0)
+
+    reader.read = read
+    return reader
+
+
+class TestGlitchedReads:
+    """On the Pi a read was seen returning exactly double the true temperature (53.5 for
+    26.75), a one-bit slip in the bit-banged SPI read that raised no fault. get() therefore
+    only trusts a value that two reads agree on."""
+
+    def test_two_agreeing_reads_return_the_value(self):
+        reader = scripted_reader(word(26.75), word(26.75))
+        assert reader.get() == 26.75
+        assert reader.reads == 2
+
+    def test_a_glitched_first_read_is_discarded(self):
+        reader = scripted_reader(slipped(word(26.75)), word(26.75), word(26.75))
+        assert reader.get() == 26.75
+
+    def test_a_glitched_second_read_is_discarded(self):
+        reader = scripted_reader(word(26.75), slipped(word(26.75)), word(26.75), word(26.75))
+        assert reader.get() == 26.75
+
+    def test_the_same_glitch_twice_but_not_back_to_back_is_not_trusted(self):
+        reader = scripted_reader(slipped(word(26.75)), word(26.75), slipped(word(26.75)), word(26.75), word(26.75))
+        assert reader.get() == 26.75
+
+    def test_reads_that_never_agree_are_an_error_not_a_guess(self):
+        reader = scripted_reader(*[word(t) for t in (20, 30, 40, 50, 60, 70)])
+        with pytest.raises(MAX31855Error) as excinfo:
+            reader.get()
+        assert 'agree' in excinfo.value.value
+        assert reader.reads <= 6
+
+    def test_a_small_difference_between_reads_is_not_a_disagreement(self):
+        # the sensor converts every 100 ms, so two quick reads can straddle an update
+        reader = scripted_reader(word(100.0), word(100.5))
+        assert reader.get() == 100.5
+
+    @pytest.mark.parametrize('reserved', [1 << 17, 1 << 3])
+    def test_a_word_with_a_reserved_bit_set_is_not_trusted(self, reserved):
+        bad = word(26.75) | reserved       # D17 and D3 are always 0 on a good read
+        reader = scripted_reader(bad, bad, word(26.75), word(26.75))
+        assert reader.get() == 26.75
+
+    def test_a_fault_still_raises_immediately(self):
+        reader = scripted_reader(word(26.75) | 0x10000 | 1)
+        with pytest.raises(MAX31855Error) as excinfo:
+            reader.get()
+        assert excinfo.value.value == 'No Connection'
+        assert reader.reads == 1
+
+    def test_the_agreed_value_is_converted_to_the_requested_units(self):
+        reader = scripted_reader(word(100.0), word(100.0), units='f')
+        assert reader.get() == 212.0

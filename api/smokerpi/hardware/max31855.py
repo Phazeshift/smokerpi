@@ -10,6 +10,8 @@ class MAX31855(object):
      - The [GPIO Library](https://code.google.com/p/raspberry-gpio-python/) (Already on most Raspberry Pi OS builds)
      - A [Raspberry Pi](http://www.raspberrypi.org/)
     '''
+    RESERVED_BITS = (1 << 17) | (1 << 3)
+
     def __init__(self, cs_pin, clock_pin, data_pin, units = "c", board = GPIO.BCM):
         '''Initialize Soft (Bitbang) SPI bus
         Parameters:
@@ -35,11 +37,31 @@ class MAX31855(object):
         # Pull chip select high to make chip inactive
         GPIO.output(self.cs_pin, GPIO.HIGH)
 
+    # A read is only trusted when it and the read just before it agree to within AGREEMENT_C.
+    # The sensor converts every 100 ms, so two back-to-back reads normally return the same
+    # value or one step apart.
+    AGREEMENT_C = 1.0
+    MAX_READS = 6
+
     def get(self):
-        '''Reads SPI bus and returns current value of thermocouple.'''
-        self.read()
-        self.checkErrors()
-        return getattr(self, "to_" + self.units)(self.data_to_tc_temperature())
+        '''Reads SPI bus and returns current value of thermocouple.
+
+        The bit-banged read sometimes comes back wrong without raising a fault; one such
+        read returned exactly double the real temperature (53.5 for 26.75), so a single read
+        is never trusted: this returns a value only once two consecutive reads agree, and raises
+        MAX31855Error if they will not. Faults (open or shorted thermocouple) raise at once.'''
+        previous = None
+        for _ in range(self.MAX_READS):
+            self.read()
+            self.checkErrors()
+            if self.data & self.RESERVED_BITS:
+                previous = None    # D17 and D3 are always 0 on a good read
+                continue
+            celsius = self.data_to_tc_temperature()
+            if previous is not None and abs(celsius - previous) <= self.AGREEMENT_C:
+                return getattr(self, "to_" + self.units)(celsius)
+            previous = celsius
+        raise MAX31855Error("Readings do not agree")
 
     def get_rj(self):
         '''Reads SPI bus and returns current value of reference junction.'''
