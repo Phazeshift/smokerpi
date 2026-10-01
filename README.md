@@ -52,3 +52,26 @@ The settings live in `api/config.json` in the install directory. It is created w
 - **Changing settings:** the three editable settings (`set_temperature`, `damper_minimum`, `damper_maximum`) can be changed on the Config page and apply immediately. Pins and intervals are read-only there because they only take effect at startup: edit `config.json` on the Pi and restart with `sudo service smokerpiboot restart`.
 - **`blower_minimum`** used to be a setting but the control loop stopped reading it when the damper was added (the blower is simply on when the PID output is above 99, otherwise off), so it was removed. An old `config.json` that still contains it is fine: it is ignored.
 - **Before reinstalling the OS**, back the file up, e.g. `cp api/config.json ~/smokerpi-config.json`, and copy it back into `api/` before the first start. Otherwise the defaults are used, and with them a fully open servo range of 500-2500 us instead of 500-1500 us.
+
+### Parts and power
+
+This install uses a Raspberry Pi Zero, an MG90S micro servo for the damper (it works with the Pi's 3.3 V signal level; its pulse range is typically about 500-2400 us), and a 5 V USB power bank (3 A) feeding the Pi through the 5 V and GND header pins, with the servo wired to the same 5 V and ground lines. Powering through the header bypasses the Pi's input fuse and protection, so use a regulated 5 V supply and take care not to short it.
+
+### Troubleshooting the damper servo
+
+If the servo clicks, twitches or ignores commands, work from the Pi outwards so you know which part is at fault:
+
+1. **Is pigpiod running?** `pigs t` prints a number if it is. This only proves the daemon accepts commands, not that the servo gets a good signal.
+2. **Is the Pi producing the right pulses?** The servo signal is a pulse every 20 ms, so a multimeter on DC volts between the signal pin (GPIO 13, header pin 33) and a GND pin reads its average: 3.3 V x pulse width / 20 ms. With the servo connected, run `pigs s 13 <width>` and compare with the table below. Finish with `pigs s 13 0`, which stops the signal (about 0 V). If the readings match, the Pi and pigpio are fine and the fault is downstream.
+3. **Check the servo's supply:** about 4.8 V or more at the servo, steady while it moves, with its ground joined to the Pi's ground.
+4. **Check the cable between the Pi and the servo.** On this install an extension lead made three different servos click and ignore most commands (only the longest pulses got through) while the pulses and the supply measured fine; connected directly to the Pi they worked. Keep the signal run short and use a short, good-quality lead. For a long run, buffer the signal at the Pi end (a 74AHCT125 or similar), add a series resistor of about 220 ohm, and put a 470 uF capacitor across the servo's supply.
+5. **Test unloaded and stay in range.** Detach the linkage, keep to 500-2500, and do not keep pressing the button while it clicks: a servo with stripped gears wears further with every press.
+
+| `pigs s 13 ...` | Expected average on the signal pin |
+| --- | --- |
+| 1000 | about 0.17 V |
+| 1500 | about 0.25 V |
+| 2000 | about 0.33 V |
+| 2400 | about 0.40 V |
+
+A servo that clicks can also simply be driven past the end of its travel. To find the real travel, step `pigs s 13 <width>` in 100 us steps and note where the damper is fully closed and fully open, then enter those as `damper_minimum` and `damper_maximum` on the Config page. The app treats the larger pulse as open.
