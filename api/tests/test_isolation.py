@@ -28,3 +28,10 @@ def test_posting_config_does_not_touch_the_real_config_file(client):
     assert response.status_code == 200
     assert snapshot('config.json') == before
 
+
+
+def test_the_module_level_app_does_not_keep_its_files_in_the_api_directory():
+    # importing smokerpi creates a real app with a running worker thread, which writes its
+    # graph history for the life of the test run; that must not land in the real api/data
+    from smokerpi import app as singleton
+    assert API_DIR not in singleton.smokerpi_history.path.resolve().parents

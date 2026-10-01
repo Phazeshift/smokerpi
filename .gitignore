@@ -30,3 +30,5 @@ __pycache__
 config.json
 
 .vs
+# SmokerPi session history (api/smokerpi/history.py)
+/api/data/

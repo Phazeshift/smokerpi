@@ -9,6 +9,7 @@ from .hardware.pitcontroller import PitController
 from .hardware.max31855 import MAX31855, TestMAX31855, MAX31855Error
 from .config import Config, validateEditableConfig
 from .pid import AntiWindupPID
+from .history import History, GRAPH_TIME
 from datetime import datetime
 import array
 import platform
@@ -35,6 +36,9 @@ def configureLogging():
     handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+
+
+GRAPH_POINTS = 2000   # how many points the graph keeps in memory, and restores after a restart
 
 
 def create_app(test_config=None):
@@ -86,6 +90,12 @@ def create_app(test_config=None):
             app.smokerpi_config = Config(app.smokerpi_test).loadConfig()
         app.smokerpi_workerInterval = app.smokerpi_config['worker_interval']
         configure()
+        # The graph survives a restart: its points are kept in data/history.csv (next to config.json
+        # and log/, which update.sh leaves alone), and the newest are loaded back here, keeping their point numbers so the numbering carries on.
+        app.smokerpi_history = History(os.path.join('data', 'history.csv'),
+                                       int(float(app.smokerpi_config.get('history_max_mb', 5)) * 1024 * 1024))
+        app.smokerpi_graphData = app.smokerpi_history.recent(GRAPH_POINTS)
+        app.smokerpi_graphIndex = app.smokerpi_graphData[-1]['i'] + 1 if app.smokerpi_graphData else 0
         if test_config is None or test_config.get('start_worker', True):
             app.worker = threading.Thread(target=worker)
             app.worker.daemon = True
@@ -161,6 +171,11 @@ def create_app(test_config=None):
         if app.smokerpi_stepErrors:
             return '; '.join('%s: %s' % item for item in app.smokerpi_stepErrors.items())
         return None
+
+    @app.route('/api/history.csv')
+    def history():
+        return Response(app.smokerpi_history.read_all(), mimetype='text/csv',
+                        headers={'Content-Disposition': 'attachment; filename="smokerpi-history.csv"'})
 
     @app.route('/api/state')
     def state():
@@ -258,11 +273,15 @@ def create_app(test_config=None):
         graphLast = time.time()
         if (graphLast - app.smokerpi_graphLast < app.smokerpi_config['graph_interval']):
             return 0
-        app.smokerpi_graphData.append({ 'i': app.smokerpi_graphIndex, 'x': datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 't': app.smokerpi_currentTemperature, 'b': app.smokerpi_blower.state,'d': app.smokerpi_damper.state, 's': app.smokerpi_config['set_temperature'] })
-        while (len(app.smokerpi_graphData) > 2000):
+        now = datetime.now()
+        point = { 'i': app.smokerpi_graphIndex, 'x': now.strftime(GRAPH_TIME), 't': app.smokerpi_currentTemperature, 'b': app.smokerpi_blower.state,'d': app.smokerpi_damper.state, 's': app.smokerpi_config['set_temperature'] }
+        app.smokerpi_graphData.append(point)
+        while (len(app.smokerpi_graphData) > GRAPH_POINTS):
             del app.smokerpi_graphData[0]
         app.smokerpi_graphIndex = app.smokerpi_graphIndex + 1
         app.smokerpi_graphLast = graphLast
+        # Never raises: a disk problem is logged and must not touch the control loop.
+        app.smokerpi_history.append(point['i'], now, point['t'], point['b'], point['d'], point['s'])
 
     def runStep(name, step):
         try:
