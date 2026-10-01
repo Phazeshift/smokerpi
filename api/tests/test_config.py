@@ -19,6 +19,7 @@ class TestDefaultConfig:
         defaults = config.defaultConfig()
         assert defaults['worker_interval'] == 10
         assert defaults['graph_interval'] == 10
+        assert defaults['sensor_timeout'] == 60
 
 
 class TestApplyTestConfig:
