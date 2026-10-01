@@ -35,3 +35,22 @@ test('fetches the current state on mount', () => {
 
   expect(fetch).toHaveBeenCalledWith('/api/state');
 });
+
+
+test('shows a worker error from the server', () => {
+  const state = { temperature: 107, targetTemperature: 105, blower: 0, damper: 40, pid: true, workerError: 'temperature read: spi boom' };
+  fetch.mockResponse(JSON.stringify(state));
+
+  renderWithStore(<StatusCard />, { preloadedState: { smokerpi: { graphData: [], graphIndex: 0, state } } });
+
+  expect(screen.getByRole('alert')).toHaveTextContent('temperature read: spi boom');
+});
+
+test('shows no alert when the worker is fine', () => {
+  const state = { temperature: 107, targetTemperature: 105, blower: 0, damper: 40, pid: true, workerError: null };
+  fetch.mockResponse(JSON.stringify(state));
+
+  renderWithStore(<StatusCard />, { preloadedState: { smokerpi: { graphData: [], graphIndex: 0, state } } });
+
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
