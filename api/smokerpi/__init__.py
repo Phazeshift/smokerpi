@@ -40,6 +40,8 @@ def create_app(test_config=None):
     app.smokerpi_graphData = []
     app.smokerpi_graphIndex = 0
     app.smokerpi_running = True
+    app.smokerpi_clock = time.monotonic
+    app.smokerpi_lastReading = app.smokerpi_clock()
     app.smokerpi_config = { }
 
     def configure():
@@ -147,10 +149,17 @@ def create_app(test_config=None):
         return json.dumps(app.smokerpi_config)
 
     def monitorTemp():
+        # The thermocouple sometimes fails to answer one check and answers the next, so a
+        # failed read keeps the last good temperature. Only a sensor that has been silent
+        # for sensor_timeout seconds is a failure, which stops the PID and the blower.
         try:
             app.smokerpi_currentTemperature = app.smokerpi_max31855.get()
-        except (MAX31855Error):
-            pass
+            app.smokerpi_lastReading = app.smokerpi_clock()
+        except Exception as e:
+            silent = app.smokerpi_clock() - app.smokerpi_lastReading
+            if silent >= app.smokerpi_config['sensor_timeout']:
+                raise
+            app.logger.warning('Temperature read failed (%r), using the last reading; no good reading for %.0fs', e, silent)
 
     def updatePid():
         output = app.smokerpi_pid(app.smokerpi_currentTemperature)
