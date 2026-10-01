@@ -1,9 +1,14 @@
 import json
+import math
 import re
 
 # Settings the API lets a client change. Everything else in the config (pins, intervals)
 # is read-only over the API: it needs a restart to take effect, so edit config.json.
 EDITABLE_FIELDS = ('set_temperature', 'damper_minimum', 'damper_maximum')
+
+# PID gains are also editable, but optional in a POST so a client that only knows the three
+# settings above keeps working. Sanity limits, not tuning advice.
+PID_FIELDS = {'pid_kp': 100, 'pid_ki': 10, 'pid_kd': 100}
 
 # Limits, from the hardware code: the damper maps 0-100 onto a servo pulse width between
 # damper_minimum and damper_maximum, which pigpio only accepts between 500 and 2500
@@ -21,6 +26,18 @@ def _whole_number(value):
     if isinstance(value, str) and re.fullmatch(r'\s*-?\d+\s*', value):
         return int(value)
     raise ValueError(value)
+
+
+def _gain(value):
+    if isinstance(value, bool):
+        raise ValueError(value)
+    try:
+        number = float(value.strip() if isinstance(value, str) else value)
+    except (TypeError, ValueError):
+        raise ValueError(value)
+    if not math.isfinite(number):
+        raise ValueError(value)
+    return number
 
 
 def validateEditableConfig(payload):
@@ -47,6 +64,17 @@ def validateEditableConfig(payload):
             continue
         if number < low or (high is not None and number > high):
             errors[field] = message
+        else:
+            values[field] = number
+    for field, high in PID_FIELDS.items():
+        if field not in payload:
+            continue
+        try:
+            number = _gain(payload[field])
+        except ValueError:
+            number = None
+        if number is None or number < 0 or number > high:
+            errors[field] = 'must be a number between 0 and %g' % high
         else:
             values[field] = number
     if 'damper_minimum' in values and 'damper_maximum' in values             and values['damper_minimum'] >= values['damper_maximum']:

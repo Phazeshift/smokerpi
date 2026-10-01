@@ -139,3 +139,74 @@ test('does not show or post blower_minimum, even if the server still sends it', 
   const postCall = fetch.mock.calls.find(([url]) => url === '/api/config');
   expect(JSON.parse(postCall[1].body)).not.toHaveProperty('blower_minimum');
 });
+
+describe('PID gains', () => {
+  const withGains = { ...fullConfig, pid_kp: 1, pid_ki: 0.1, pid_kd: 0.05 };
+  const renderWithGains = () => renderWithStore(<Config />, {
+    preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config: withGains } },
+  });
+
+  beforeEach(() => {
+    fetch.mockResponse(JSON.stringify(withGains));
+  });
+
+  test('shows the gains as editable fields, filled in from the config', () => {
+    renderWithGains();
+
+    expect(screen.getByLabelText('PID Kp (proportional)')).toHaveValue('1');
+    expect(screen.getByLabelText('PID Ki (integral, per second)')).toHaveValue('0.1');
+    expect(screen.getByLabelText('PID Kd (derivative)')).toHaveValue('0.05');
+    expect(screen.getByLabelText('PID Ki (integral, per second)')).not.toBeDisabled();
+  });
+
+  test('posts the gains, as entered, with the other settings', () => {
+    renderWithGains();
+    fetch.mockClear();
+
+    fireEvent.change(screen.getByLabelText('PID Kp (proportional)'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('PID Ki (integral, per second)'), { target: { value: '0.005' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    const body = JSON.parse(fetch.mock.calls.find(([url]) => url === '/api/config')[1].body);
+    expect(body).toMatchObject({ pid_kp: '5', pid_ki: '0.005', pid_kd: 0.05, set_temperature: 105 });
+  });
+
+  test.each([
+    ['PID Kp (proportional)', 'fast', 'Enter a number'],
+    ['PID Ki (integral, per second)', '-1', 'Enter a number, 0 or more'],
+    ['PID Kd (derivative)', '', 'Enter value'],
+  ])('%s = "%s" shows an error and is not posted', (label, value, message) => {
+    renderWithGains();
+    fetch.mockClear();
+
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalledWith('/api/config', expect.anything());
+  });
+
+  test('accepts decimals and zero', () => {
+    renderWithGains();
+    fetch.mockClear();
+
+    fireEvent.change(screen.getByLabelText('PID Ki (integral, per second)'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('PID Kp (proportional)'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(fetch).toHaveBeenCalledWith('/api/config', expect.anything());
+  });
+
+  test('shows no gain fields, and posts none, when the server does not send them', () => {
+    // a server older than the gains setting
+    fetch.mockResponse(JSON.stringify(fullConfig));
+    renderConfig();
+    fetch.mockClear();
+
+    expect(screen.queryByLabelText('PID Kp (proportional)')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Save'));
+
+    const body = JSON.parse(fetch.mock.calls.find(([url]) => url === '/api/config')[1].body);
+    expect(Object.keys(body).some(key => key.startsWith('pid_'))).toBe(false);
+  });
+});

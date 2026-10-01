@@ -178,6 +178,7 @@ def create_app(test_config=None):
                 return jsonify(error=message, errors=errors), 400
             app.smokerpi_config.update(values)
             app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
+            app.smokerpi_pid.tunings = (app.smokerpi_config['pid_kp'], app.smokerpi_config['pid_ki'], app.smokerpi_config['pid_kd'])
             app.smokerpi_damper.min = app.smokerpi_config['damper_minimum']
             app.smokerpi_damper.max = app.smokerpi_config['damper_maximum']
             Config(app.smokerpi_test).saveConfig(app.smokerpi_config)

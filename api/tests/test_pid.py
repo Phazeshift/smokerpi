@@ -132,12 +132,3 @@ class TestGainsFromConfig:
             assert app.smokerpi_pid.tunings == (1, 0.1, 0.05)
         finally:
             app.smokerpi_running = False
-
-    def test_the_gains_are_not_editable_over_the_api(self):
-        app = self.make_app()
-        try:
-            app.test_client().post('/api/config', json={
-                'set_temperature': 120, 'damper_minimum': 500, 'damper_maximum': 2500, 'pid_kp': 99})
-            assert app.smokerpi_pid.tunings == (1, 0.1, 0.05)
-        finally:
-            app.smokerpi_running = False
