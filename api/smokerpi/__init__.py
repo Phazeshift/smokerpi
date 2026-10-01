@@ -18,11 +18,27 @@ import json
 import threading
 
 
+def configureLogging():
+    """Log to ./log/app.log, capped at 4 x 1 MB so it cannot fill the Pi's SD card.
+
+    Replaces any handler a previous call added, so creating the app more than once (as the
+    tests do) does not log every line twice."""
+    root = logging.getLogger()
+    for old in [h for h in root.handlers if getattr(h, 'smokerpi', False)]:
+        root.removeHandler(old)
+        old.close()
+    handler = RotatingFileHandler('./log/app.log', maxBytes=1024 * 1024, backupCount=3)
+    handler.smokerpi = True
+    handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
 def create_app(test_config=None):
     app = Flask(__name__, static_folder='../../build', static_url_path='/')
 
     os.makedirs('./log', exist_ok=True)
-    logging.basicConfig(filename='./log/app.log',level=logging.DEBUG)
+    configureLogging()
 
     app.logger.info("### NEW STARTUP Version 0.1")
     app.config['SECRET_KEY'] = 'smokerpi-secret!'
