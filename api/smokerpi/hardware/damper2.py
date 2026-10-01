@@ -5,9 +5,12 @@ except (RuntimeError, ModuleNotFoundError):
     pass
 
 class Damper:    
-    def __init__(self, pin = 13, min = 500, max = 2500):
+    def __init__(self, pin = 13, min = 500, max = 2500, invert = False):
         self.min = min
         self.max = max
+        # Some linkages open the damper at the smaller pulse width. Position 100 always means
+        # open; invert only changes which end of the pulse range it is sent as.
+        self.invert = invert
         self.pi = None
         self.pin = pin
         self.state = -1
@@ -41,10 +44,19 @@ class Damper:
         finally:
             self.disconnect()
 
+    def reposition(self):
+        # Send the current position again, e.g. after invert changed. If the move fails the
+        # position is left unknown (-1) so the next open() of the same value is sent rather
+        # than skipped as a no-op.
+        value, self.state = self.state, -1
+        if value != -1:
+            self.open(value)
+
     def open(self, value):        
         if (value == self.state):
             return
-        pos = (((self.max - self.min) / 100) * value) + self.min
+        travel = (100 - value) if self.invert else value
+        pos = (((self.max - self.min) / 100) * travel) + self.min
         try:
             pi = self.connect()
             pi.set_servo_pulsewidth(self.pin, pos)
@@ -58,6 +70,10 @@ class Damper:
 class TestDamper():
     def __init__(self):
         self.state = -1
+        self.invert = False
+        pass
+
+    def reposition(self):
         pass
 
     def open(self, value):

@@ -210,3 +210,67 @@ describe('PID gains', () => {
     expect(Object.keys(body).some(key => key.startsWith('pid_'))).toBe(false);
   });
 });
+
+describe('Damper invert', () => {
+  const withInvert = { ...fullConfig, damper_invert: false };
+
+  beforeEach(() => {
+    fetch.mockResponse(JSON.stringify(withInvert));
+  });
+
+  const renderWithInvert = (config = withInvert) => renderWithStore(<Config />, {
+    preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config } },
+  });
+
+  test('shows an unticked checkbox when the damper is not inverted', () => {
+    renderWithInvert();
+    const box = screen.getByLabelText(/Invert damper/);
+    expect(box).toHaveAttribute('type', 'checkbox');
+    expect(box).not.toBeChecked();
+    expect(box).not.toBeDisabled();
+  });
+
+  test('shows it ticked when the damper is inverted', () => {
+    fetch.mockResponse(JSON.stringify({ ...withInvert, damper_invert: true }));
+    renderWithInvert({ ...withInvert, damper_invert: true });
+    expect(screen.getByLabelText(/Invert damper/)).toBeChecked();
+  });
+
+  test('ticking it posts damper_invert as a boolean true', () => {
+    renderWithInvert();
+    fetch.mockClear();
+
+    fireEvent.click(screen.getByLabelText(/Invert damper/));
+    fireEvent.click(screen.getByText('Save'));
+
+    const body = JSON.parse(fetch.mock.calls.find(([url]) => url === '/api/config')[1].body);
+    expect(body.damper_invert).toBe(true);
+  });
+
+  test('posts false when it is left unticked', () => {
+    renderWithInvert();
+    fetch.mockClear();
+
+    fireEvent.click(screen.getByText('Save'));
+
+    const body = JSON.parse(fetch.mock.calls.find(([url]) => url === '/api/config')[1].body);
+    expect(body.damper_invert).toBe(false);
+  });
+
+  test('explains what it does', () => {
+    renderWithInvert();
+    expect(screen.getByText(/smaller pulse width/i)).toBeInTheDocument();
+  });
+
+  test('is not shown, and not posted, when the server does not send it', () => {
+    fetch.mockResponse(JSON.stringify(fullConfig));
+    renderConfig();
+    fetch.mockClear();
+
+    expect(screen.queryByLabelText(/Invert damper/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Save'));
+
+    const body = JSON.parse(fetch.mock.calls.find(([url]) => url === '/api/config')[1].body);
+    expect(body).not.toHaveProperty('damper_invert');
+  });
+});

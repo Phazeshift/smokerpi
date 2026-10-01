@@ -77,6 +77,11 @@ def validateEditableConfig(payload):
             errors[field] = 'must be a number between 0 and %g' % high
         else:
             values[field] = number
+    if 'damper_invert' in payload:
+        if isinstance(payload['damper_invert'], bool):
+            values['damper_invert'] = payload['damper_invert']
+        else:
+            errors['damper_invert'] = 'must be true or false'
     if 'damper_minimum' in values and 'damper_maximum' in values             and values['damper_minimum'] >= values['damper_maximum']:
         errors['damper_minimum'] = 'must be less than damper_maximum'
         del values['damper_minimum']
@@ -127,4 +132,4 @@ class Config:
             json.dump(data, configfile)
 
     def defaultConfig(self):
-        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'sensor_timeout': 60, 'password': '', 'pid_kp': 1, 'pid_ki': 0.1, 'pid_kd': 0.05, 'damper_minimum': 500, 'damper_maximum': 2500 }        
+        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'sensor_timeout': 60, 'password': '', 'pid_kp': 1, 'pid_ki': 0.1, 'pid_kd': 0.05, 'damper_invert': False, 'damper_minimum': 500, 'damper_maximum': 2500 }        

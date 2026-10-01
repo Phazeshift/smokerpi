@@ -12,7 +12,7 @@ Last updated 2026-10-01, after release v0.3.2.
 ## Needs a decision
 
 - [x] **Thermocouple faults.** Done: a missed read keeps the last good reading, and the blower goes off and the PID is skipped once the thermocouple has been silent for `sensor_timeout` (60s). Still to decide: whether a damper position should also be forced on timeout.
-- [ ] **Damper direction and travel.** The app treats the larger pulse width as open (`damper_maximum`) and requires `damper_minimum` < `damper_maximum`. Confirm that matches the real damper; if it opens at the smaller pulse, either flip the linkage or add an "invert" setting. Calibrate `damper_minimum` / `damper_maximum` (currently 500 / 1500) against the real damper, using the procedure at the end of "Troubleshooting the damper servo" in the README.
+- [ ] **Damper direction and travel.** An "Invert damper" setting now exists (Config page / `damper_invert`), so a damper that opens at the smaller pulse width no longer needs re-linking. Still to do on the real damper: confirm which way it opens, set the checkbox if needed, and calibrate `damper_minimum` / `damper_maximum` (currently 500 / 1500) using the procedure at the end of "Troubleshooting the damper servo" in the README.
 
 ## To do
 
