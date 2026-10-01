@@ -15,6 +15,7 @@ class TestStateEndpoint:
             'blower': 0,
             'pid': False,
             'damper': 99,
+            'workerError': None,
         }
 
 

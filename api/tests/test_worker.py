@@ -3,6 +3,7 @@
 An exception in it used to kill the thread silently: the temperature and PID froze, and a
 running blower stayed running unsupervised. These tests cover the loop surviving errors, and
 failing safe (blower off) when a hardware or sensor step fails."""
+import json
 import logging
 import time
 
@@ -254,6 +255,61 @@ class TestSensorDropouts:
         app.smokerpi_workerStep()
 
         assert app.smokerpi_blower.state == 0
+
+
+class TestWorkerHealth:
+    """/api/state reports when the control loop is not working, so the UI can say so
+    instead of leaving the person to notice a frozen temperature."""
+
+    def workerError(self, app):
+        return json.loads(app.test_client().get('/api/state').data)['workerError']
+
+    def test_no_error_when_every_step_works(self, app):
+        app.smokerpi_workerStep()
+        assert self.workerError(app) is None
+
+    def test_a_failing_pid_step_is_reported_with_its_message(self, app):
+        app.smokerpi_pidRunning = True
+        app.smokerpi_pitController = Exploding('damper boom')
+        app.smokerpi_workerStep()
+        assert 'PID update' in self.workerError(app)
+        assert 'damper boom' in self.workerError(app)
+
+    def test_a_missed_read_within_the_timeout_is_not_reported(self, app):
+        app.smokerpi_max31855 = Flaky()
+        app.smokerpi_max31855.failing = True
+        clock = Clock(app)
+        clock.advance(10)
+        app.smokerpi_workerStep()
+        assert self.workerError(app) is None
+
+    def test_a_sensor_timeout_is_reported(self, app):
+        app.smokerpi_max31855 = Flaky()
+        app.smokerpi_max31855.failing = True
+        clock = Clock(app)
+        clock.advance(app.smokerpi_config['sensor_timeout'])
+        app.smokerpi_workerStep()
+        assert 'temperature read' in self.workerError(app)
+
+    def test_the_error_clears_when_the_fault_clears(self, app):
+        app.smokerpi_pidRunning = True
+        app.smokerpi_pitController = Exploding()
+        app.smokerpi_workerStep()
+        app.smokerpi_pitController = Recorder()
+        app.smokerpi_workerStep()
+        assert self.workerError(app) is None
+
+    def test_a_loop_that_has_stopped_running_is_reported(self, app):
+        clock = Clock(app)
+        app.smokerpi_workerStep()
+        clock.advance(120)                 # no pass for two minutes
+        assert 'stopped' in self.workerError(app)
+
+    def test_a_pass_after_a_long_gap_clears_the_stopped_report(self, app):
+        clock = Clock(app)
+        clock.advance(120)
+        app.smokerpi_workerStep()
+        assert self.workerError(app) is None
 
 
 class TestTheThread:

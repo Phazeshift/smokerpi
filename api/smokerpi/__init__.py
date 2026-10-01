@@ -42,6 +42,8 @@ def create_app(test_config=None):
     app.smokerpi_running = True
     app.smokerpi_clock = time.monotonic
     app.smokerpi_lastReading = app.smokerpi_clock()
+    app.smokerpi_lastPass = app.smokerpi_clock()
+    app.smokerpi_stepErrors = {}
     app.smokerpi_config = { }
 
     def configure():
@@ -95,9 +97,19 @@ def create_app(test_config=None):
                 graphData.append(val)
         return json.dumps(graphData)
 
+    def workerError():
+        """Why the control loop is not working, or None. Shown to the user, who would
+        otherwise only see a frozen temperature."""
+        silent = app.smokerpi_clock() - app.smokerpi_lastPass
+        if silent > max(30, 3 * app.smokerpi_workerInterval):
+            return 'Control loop has stopped (no pass for %d seconds)' % silent
+        if app.smokerpi_stepErrors:
+            return '; '.join('%s: %s' % item for item in app.smokerpi_stepErrors.items())
+        return None
+
     @app.route('/api/state')
     def state():
-        app.smokerpi_currentState = { 'temperature': app.smokerpi_currentTemperature, 'targetTemperature': app.smokerpi_config['set_temperature'], 'blower': app.smokerpi_blower.state, 'pid': app.smokerpi_pidRunning, 'damper': app.smokerpi_damper.state }
+        app.smokerpi_currentState = { 'temperature': app.smokerpi_currentTemperature, 'targetTemperature': app.smokerpi_config['set_temperature'], 'blower': app.smokerpi_blower.state, 'pid': app.smokerpi_pidRunning, 'damper': app.smokerpi_damper.state, 'workerError': workerError() }
         return json.dumps(app.smokerpi_currentState)
 
     @app.route('/api/config', methods = ['GET', 'POST'])
@@ -179,9 +191,11 @@ def create_app(test_config=None):
     def runStep(name, step):
         try:
             step()
+            app.smokerpi_stepErrors.pop(name, None)
             return True
-        except Exception:
+        except Exception as e:
             app.logger.exception('Worker step failed: %s', name)
+            app.smokerpi_stepErrors[name] = str(e) or type(e).__name__
             return False
 
     def failSafe():
@@ -202,6 +216,7 @@ def create_app(test_config=None):
         runStep('graph update', graphData)
         if not (sensorOk and controlOk):
             failSafe()
+        app.smokerpi_lastPass = app.smokerpi_clock()
 
     app.smokerpi_workerStep = workerStep
 
