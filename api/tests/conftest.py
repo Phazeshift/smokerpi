@@ -18,6 +18,14 @@ def default_config():
     return Config(test=True).defaultConfig()
 
 
+@pytest.fixture(autouse=True)
+def isolated_cwd(tmp_path, monkeypatch):
+    """Run every test in a scratch directory. create_app writes ./log/app.log and the config
+    endpoint saves ./config.json, which would otherwise land in the real api/ directory and
+    overwrite a developer's local config."""
+    monkeypatch.chdir(tmp_path)
+
+
 @pytest.fixture
 def app():
     """A smokerpi Flask app with emulated hardware, no real config.json I/O,
