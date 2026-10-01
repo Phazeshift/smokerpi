@@ -341,7 +341,3 @@ def create_app(test_config=None):
         app.logger.warning('No password set in config.json: anyone on the network can control the smoker')
 
     return app
-
-
-app = create_app()
-cleanupHardware = app.cleanupHardware
