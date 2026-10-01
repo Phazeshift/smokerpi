@@ -123,3 +123,63 @@ class TestServerErrors:
 
         assert response.status_code == 500
         assert 'kaboom' in caplog.text
+
+
+class TestPidGains:
+    """pid_kp, pid_ki and pid_kd are editable and apply to the running controller at once.
+    They are optional in a POST so a client that only knows the original three settings keeps
+    working."""
+
+    def test_valid_gains_apply_to_the_running_controller(self, client, app):
+        response = client.post('/api/config', json=valid_payload(pid_kp=5, pid_ki=0.005, pid_kd=0))
+        assert response.status_code == 200
+        assert app.smokerpi_pid.tunings == (5.0, 0.005, 0.0)
+        data = json.loads(response.data)
+        assert (data['pid_kp'], data['pid_ki'], data['pid_kd']) == (5.0, 0.005, 0.0)
+
+    def test_gains_sent_as_strings_are_accepted(self, client, app):
+        # the web form sends strings
+        response = client.post('/api/config', json=valid_payload(pid_kp='2.5', pid_ki=' 0.01 ', pid_kd='0'))
+        assert response.status_code == 200
+        assert app.smokerpi_pid.tunings == (2.5, 0.01, 0.0)
+
+    def test_gains_are_saved_to_config_json(self, client, tmp_path):
+        client.post('/api/config', json=valid_payload(pid_kp=5, pid_ki=0.005, pid_kd=0))
+        saved = json.loads((tmp_path / 'config.json').read_text())
+        assert (saved['pid_kp'], saved['pid_ki'], saved['pid_kd']) == (5.0, 0.005, 0.0)
+
+    def test_omitting_them_leaves_the_gains_alone(self, client, app):
+        client.post('/api/config', json=valid_payload(pid_kp=5))
+        response = client.post('/api/config', json=valid_payload())
+        assert response.status_code == 200
+        assert app.smokerpi_pid.tunings[0] == 5.0
+
+    def test_a_partial_set_changes_only_the_ones_given(self, client, app):
+        client.post('/api/config', json=valid_payload(pid_ki=0.02))
+        assert app.smokerpi_pid.tunings == (1, 0.02, 0.05)
+
+    @pytest.mark.parametrize('field,value', [
+        ('pid_kp', ''), ('pid_kp', 'fast'), ('pid_kp', None), ('pid_kp', True), ('pid_kp', -1),
+        ('pid_kp', 'nan'), ('pid_kp', 'inf'), ('pid_kp', float('inf')), ('pid_kp', 101),
+        ('pid_ki', -0.1), ('pid_ki', 11), ('pid_ki', '1e999'),
+        ('pid_kd', -5), ('pid_kd', 101), ('pid_kd', [1]),
+    ])
+    def test_invalid_gains_are_a_400_naming_the_field_and_change_nothing(self, client, app, field, value):
+        before = current_config(client)
+        gains = app.smokerpi_pid.tunings
+
+        response = client.post('/api/config', json=valid_payload(**{field: value}))
+
+        assert response.status_code == 400
+        assert field in json.loads(response.data)['errors']
+        assert current_config(client) == before
+        assert app.smokerpi_pid.tunings == gains
+
+    def test_one_bad_gain_stops_the_valid_settings_in_the_same_post_applying(self, client):
+        before = current_config(client)
+        client.post('/api/config', json=valid_payload(set_temperature=200, pid_kp=-1))
+        assert current_config(client) == before
+
+    def test_zero_is_allowed(self, client, app):
+        assert client.post('/api/config', json=valid_payload(pid_kp=0, pid_ki=0, pid_kd=0)).status_code == 200
+        assert app.smokerpi_pid.tunings == (0, 0, 0)

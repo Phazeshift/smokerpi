@@ -62,7 +62,7 @@ Test/emulated mode is selected once, in `create_app()`: `app.smokerpi_test = pla
 
 ### PID
 
-`app.smokerpi_pid` is an `AntiWindupPID` (`api/smokerpi/pid.py`, a `simple_pid.PID` subclass): the integral is rolled back in any step that leaves the output saturated in the direction of the error, which plain `simple_pid` does not do (it only clamps the integral to the output range). Gains come from `pid_kp`/`pid_ki`/`pid_kd` in config, applied in `configure()` at startup; they are not API-editable. The blower only turns on above output 99, which with the default Kp of 1 used to be reached through windup alone; see TODO.md before changing the gains or that threshold.
+`app.smokerpi_pid` is an `AntiWindupPID` (`api/smokerpi/pid.py`, a `simple_pid.PID` subclass): the integral is rolled back in any step that leaves the output saturated in the direction of the error, which plain `simple_pid` does not do (it only clamps the integral to the output range). Gains come from `pid_kp`/`pid_ki`/`pid_kd` in config: applied in `configure()` at startup, and editable over `POST /api/config` (optional fields, `PID_FIELDS` in `config.py`: floats from 0 to 100/10/100; applied live by setting `pid.tunings`) and on the Config page, which only shows them if the server sends them. The blower only turns on above output 99, which with the default Kp of 1 used to be reached through windup alone; see TODO.md before changing the gains or that threshold.
 
 ### Password
 
