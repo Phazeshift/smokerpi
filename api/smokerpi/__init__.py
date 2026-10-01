@@ -1,4 +1,4 @@
-from flask import (Flask, request, jsonify)
+from flask import (Flask, Response, request, jsonify)
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import json
@@ -16,6 +16,9 @@ import time
 import os
 import json
 import threading
+import base64
+import binascii
+import hmac
 
 
 def configureLogging():
@@ -41,7 +44,6 @@ def create_app(test_config=None):
     configureLogging()
 
     app.logger.info("### NEW STARTUP Version 0.1")
-    app.config['SECRET_KEY'] = 'smokerpi-secret!'
 
     app.smokerpi_test = platform.system() == 'Windows' or os.environ.get('SMOKERPI_TEST') == '1'
     app.smokerpi_currentTemperature = 0
@@ -86,6 +88,41 @@ def create_app(test_config=None):
             app.worker = threading.Thread(target=worker)
             app.worker.daemon = True
             app.worker.start()
+
+    def passwordSupplied():
+        """The password from an HTTP Basic Authorization header, or None. Any username."""
+        scheme, _, token = request.headers.get('Authorization', '').partition(' ')
+        if scheme.lower() != 'basic':
+            return None
+        try:
+            _, colon, password = base64.b64decode(token.strip(), validate=True).decode('utf-8').partition(':')
+        except (binascii.Error, UnicodeDecodeError):
+            return None
+        return password if colon else None
+
+    @app.before_request
+    def requirePassword():
+        # Protects the page and the API alike. With no password configured everything is open.
+        expected = app.smokerpi_config.get('password', '')
+        if not expected:
+            return None
+        supplied = passwordSupplied()
+        if supplied is not None and hmac.compare_digest(supplied.encode('utf-8'), expected.encode('utf-8')):
+            return None
+        return Response('Password required', 401, {'WWW-Authenticate': 'Basic realm="SmokerPi", charset="UTF-8"'})
+
+    def publicConfig():
+        return {key: value for key, value in app.smokerpi_config.items() if key != 'password'}
+
+    def enabledFlag():
+        """The `enabled` boolean of a control request, or None if the body is not valid."""
+        payload = request.get_json(silent=True)
+        if isinstance(payload, dict) and isinstance(payload.get('enabled'), bool):
+            return payload['enabled']
+        return None
+
+    def badEnabled():
+        return jsonify(error='Expected a JSON object with a true or false "enabled"'), 400
 
     @app.route('/')
     def index():
@@ -143,38 +180,47 @@ def create_app(test_config=None):
             app.smokerpi_damper.min = app.smokerpi_config['damper_minimum']
             app.smokerpi_damper.max = app.smokerpi_config['damper_maximum']
             Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
-        return json.dumps(app.smokerpi_config)
+        return json.dumps(publicConfig())
 
     @app.route('/api/blower', methods = ['POST'])
     def blower():
+        enabled = enabledFlag()
+        if enabled is None:
+            return badEnabled()
         app.smokerpi_pidRunning = False
         app.smokerpi_pid.auto_mode = False
-        if (bool(request.json['enabled'])):
+        if (enabled):
           app.smokerpi_blower.on()
         else:
           app.smokerpi_blower.off()
-        return json.dumps(app.smokerpi_config)
+        return json.dumps(publicConfig())
 
     @app.route('/api/damper', methods = ['POST'])
     def damper():
+        enabled = enabledFlag()
+        if enabled is None:
+            return badEnabled()
         app.smokerpi_pidRunning = False
         app.smokerpi_pid.auto_mode = False
-        if (bool(request.json['enabled'])):
+        if (enabled):
           app.smokerpi_damper.open(100)
         else:
           app.smokerpi_damper.open(0)
-        return json.dumps(app.smokerpi_config)
+        return json.dumps(publicConfig())
 
     @app.route('/api/pid', methods = ['POST'])
     def pid():
-        if (request.json['enabled']):
+        enabled = enabledFlag()
+        if enabled is None:
+            return badEnabled()
+        if (enabled):
             app.smokerpi_pidRunning = True
             app.smokerpi_pid.auto_mode = True
         else:
             app.smokerpi_pidRunning = False
             app.smokerpi_pid.auto_mode = False
             app.smokerpi_blower.off()
-        return json.dumps(app.smokerpi_config)
+        return json.dumps(publicConfig())
 
     def monitorTemp():
         # The thermocouple sometimes fails to answer one check and answers the next, so a
@@ -258,6 +304,8 @@ def create_app(test_config=None):
     app.cleanupHardware = cleanupHardware
 
     setup()
+    if not app.smokerpi_config.get('password'):
+        app.logger.warning('No password set in config.json: anyone on the network can control the smoker')
 
     return app
 

@@ -60,6 +60,10 @@ Test/emulated mode is selected once, in `create_app()`: `app.smokerpi_test = pla
 
 `hardware/damper.py` (singular) is legacy/dead code using the Adafruit CircuitPython stack — nothing imports it; `hardware/__init__.py` is empty. Don't confuse it with the actually-used `damper2.py`.
 
+### Password
+
+`password` in `config.json` (default empty = off, so an update never locks the owner out; the startup log warns when it is off) turns on HTTP Basic auth for every request via a `before_request` hook in `create_app()`: any username, constant-time comparison. It covers the static frontend and unknown paths too. `publicConfig()` strips it from every API response and it is not in `EDITABLE_FIELDS`. The control endpoints validate `enabled` (must be a JSON boolean, else 400) before touching the PID or hardware. `api/tests/test_auth.py` covers it.
+
 ### Config persistence
 
 `api/smokerpi/config.py`'s `Config` class reads/writes `api/config.json` (gitignored, not present on a fresh checkout — `defaultConfig()` supplies fallback values that get merged with whatever's on disk and written back). In test mode it also scales `worker_interval`/`graph_interval` down 10x (`applyTestConfig`) so the emulated worker loop runs fast, but `saveConfig()` never rewrites the intervals: it saves a *copy* of the config it is given (the API passes the live dict, which must not change) and keeps whatever `worker_interval`/`graph_interval` are already on disk, falling back to the defaults. So scaled test values never leak into the persisted file, and hand-edited intervals survive a save.
