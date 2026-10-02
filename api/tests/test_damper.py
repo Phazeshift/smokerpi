@@ -61,15 +61,15 @@ class TestEmulatedDamper:
             damper.open(0)
 
     def test_the_app_uses_it(self, app):
-        assert type(app.smokerpi_damper) is Damper
+        assert type(app.smoker.damper) is Damper
 
     def test_changing_invert_in_the_app_really_moves_it(self, app, client):
-        app.smokerpi_damper.open(20)
+        app.smoker.damper.open(20)
         response = client.post('/api/config', json={
             'set_temperature': 105, 'damper_minimum': 500, 'damper_maximum': 2500, 'damper_invert': True})
         assert response.status_code == 200
-        assert app.smokerpi_damper.pi.pulses[-2] == (13, 500 + (2000 / 100) * 80)
-        assert app.smokerpi_damper.state == 20
+        assert app.smoker.damper.pi.pulses[-2] == (13, 500 + (2000 / 100) * 80)
+        assert app.smoker.damper.state == 20
 
 
 class FakePi:

@@ -10,7 +10,7 @@ def main():
 
     def handler(signal, frame):
         print('CTRL-C pressed!')
-        app.cleanupHardware()
+        app.smoker.cleanup()
         os._exit(0)
 
     signal.signal(signal.SIGTERM, handler)

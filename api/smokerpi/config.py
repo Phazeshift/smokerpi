@@ -132,14 +132,14 @@ def validateEditableConfig(payload):
     return values, errors
 
 
-def applyConfig(app):
-    """Push the settings in app.smokerpi_config onto the PID and the damper. Used at startup
-    and after a POST /api/config, so the two cannot drift apart. Returns True if the damper
+def applyConfig(smoker):
+    """Push the settings in smoker.config onto the PID and the damper. Used at startup and
+    after a POST /api/config, so the two cannot drift apart. Returns True if the damper
     direction changed."""
-    config = app.smokerpi_config
-    app.smokerpi_pid.setpoint = config['set_temperature']
-    app.smokerpi_pid.tunings = (float(config['pid_kp']), float(config['pid_ki']), float(config['pid_kd']))
-    damper = app.smokerpi_damper
+    config = smoker.config
+    smoker.pid.setpoint = config['set_temperature']
+    smoker.pid.tunings = (float(config['pid_kp']), float(config['pid_ki']), float(config['pid_kd']))
+    damper = smoker.damper
     damper.min = config['damper_minimum']
     damper.max = config['damper_maximum']
     invert = bool(config.get('damper_invert', False))

@@ -121,14 +121,14 @@ class TestGainsFromConfig:
     def test_the_app_uses_the_anti_windup_controller_with_the_configured_gains(self):
         app = self.make_app(pid_kp=5, pid_ki=0.005, pid_kd=0)
         try:
-            assert isinstance(app.smokerpi_pid, AntiWindupPID)
-            assert app.smokerpi_pid.tunings == (5, 0.005, 0)
+            assert isinstance(app.smoker.pid, AntiWindupPID)
+            assert app.smoker.pid.tunings == (5, 0.005, 0)
         finally:
-            app.smokerpi_running = False
+            app.smoker.running = False
 
     def test_the_default_app_has_the_old_gains(self):
         app = self.make_app()
         try:
-            assert app.smokerpi_pid.tunings == (1, 0.1, 0.05)
+            assert app.smoker.pid.tunings == (1, 0.1, 0.05)
         finally:
-            app.smokerpi_running = False
+            app.smoker.running = False

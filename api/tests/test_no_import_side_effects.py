@@ -65,11 +65,13 @@ class TestRunserverMain:
         import runserver
         events = {'exits': []}
 
+        class FakeSmoker:
+            def cleanup(self):
+                events['cleanup'] = True
+
         class FakeApp:
             debug = True
-
-            def cleanupHardware(self):
-                events['cleanup'] = True
+            smoker = FakeSmoker()
 
             def run(self, **kwargs):
                 events['run'] = kwargs

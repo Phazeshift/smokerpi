@@ -40,7 +40,7 @@ def app():
     and no background worker thread."""
     application = create_app(test_config={'config': default_config(), 'start_worker': False})
     yield application
-    application.smokerpi_running = False
+    application.smoker.running = False
 
 
 @pytest.fixture
