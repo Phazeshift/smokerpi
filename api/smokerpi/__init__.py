@@ -68,20 +68,34 @@ def create_app(test_config=None):
     app.smokerpi_stepErrors = {}
     app.smokerpi_config = { }
 
+    def applyConfig():
+        """Push the settings in the config onto the PID and the damper. Used at startup and
+        after a POST /api/config, so the two cannot drift apart. Returns True if the damper
+        direction changed."""
+        config = app.smokerpi_config
+        app.smokerpi_pid.setpoint = config['set_temperature']
+        app.smokerpi_pid.tunings = (float(config['pid_kp']), float(config['pid_ki']), float(config['pid_kd']))
+        damper = app.smokerpi_damper
+        damper.min = config['damper_minimum']
+        damper.max = config['damper_maximum']
+        invert = bool(config.get('damper_invert', False))
+        invertChanged = damper.invert != invert
+        damper.invert = invert
+        return invertChanged
+
     def configure():
+        config = app.smokerpi_config
         if (app.smokerpi_test):
             app.smokerpi_damper = TestDamper()
-            app.smokerpi_damper.invert = bool(app.smokerpi_config.get('damper_invert', False))
         else:
-            app.smokerpi_damper = Damper(app.smokerpi_config['damper_pin'], app.smokerpi_config['damper_minimum'], app.smokerpi_config['damper_maximum'], bool(app.smokerpi_config.get('damper_invert', False)))
-        app.smokerpi_blower = Blower(app.smokerpi_config['blower_pin1'], app.smokerpi_config['blower_pin2'])
-        app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
-        app.smokerpi_pid.tunings = (float(app.smokerpi_config['pid_kp']), float(app.smokerpi_config['pid_ki']), float(app.smokerpi_config['pid_kd']))
+            app.smokerpi_damper = Damper(config['damper_pin'], config['damper_minimum'], config['damper_maximum'], bool(config.get('damper_invert', False)))
+        app.smokerpi_blower = Blower(config['blower_pin1'], config['blower_pin2'])
+        applyConfig()
         app.smokerpi_pitController = PitController(app.smokerpi_blower, app.smokerpi_damper)
         if (app.smokerpi_test):
             app.smokerpi_max31855 = TestMAX31855(app.smokerpi_damper)
         else:
-            app.smokerpi_max31855 = MAX31855(app.smokerpi_config['cs_pin'], app.smokerpi_config['clock_pin'], app.smokerpi_config['data_pin'])
+            app.smokerpi_max31855 = MAX31855(config['cs_pin'], config['clock_pin'], config['data_pin'])
 
     def setup():
         if test_config is not None and 'config' in test_config:
@@ -193,13 +207,7 @@ def create_app(test_config=None):
                 message = 'Invalid configuration: ' + '; '.join('%s %s' % (k, v) for k, v in errors.items())
                 return jsonify(error=message, errors=errors), 400
             app.smokerpi_config.update(values)
-            app.smokerpi_pid.setpoint = app.smokerpi_config['set_temperature']
-            app.smokerpi_pid.tunings = (app.smokerpi_config['pid_kp'], app.smokerpi_config['pid_ki'], app.smokerpi_config['pid_kd'])
-            app.smokerpi_damper.min = app.smokerpi_config['damper_minimum']
-            app.smokerpi_damper.max = app.smokerpi_config['damper_maximum']
-            invert = bool(app.smokerpi_config.get('damper_invert', False))
-            invertChanged = app.smokerpi_damper.invert != invert
-            app.smokerpi_damper.invert = invert
+            invertChanged = applyConfig()
             Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
             if invertChanged:
                 # Move the damper to the mirrored position now; the PID would not re-send an
