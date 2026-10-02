@@ -3,7 +3,30 @@ import { screen, fireEvent } from '@testing-library/react';
 import { renderWithStore } from './testUtils';
 import Config from './config';
 
-const fullConfig = {
+// What the server sends in `fields` (describeFields in api/smokerpi/config.py), for the keys a
+// config has.
+const FIELD_TABLE = [
+  { name: 'cs_pin', label: 'Max CS Pin', kind: null },
+  { name: 'clock_pin', label: 'Max Clock Pin', kind: null },
+  { name: 'data_pin', label: 'Max Data Pin', kind: null },
+  { name: 'blower_pin1', label: 'Blower pin 1', kind: null },
+  { name: 'blower_pin2', label: 'Blower pin 2', kind: null },
+  { name: 'damper_pin', label: 'Damper pin', kind: null },
+  { name: 'set_temperature', label: 'Target temperature', kind: 'whole' },
+  { name: 'graph_interval', label: 'Graph interval', kind: null },
+  { name: 'pid_kp', label: 'PID Kp (proportional)', kind: 'gain' },
+  { name: 'pid_ki', label: 'PID Ki (integral, per second)', kind: 'gain' },
+  { name: 'pid_kd', label: 'PID Kd (derivative)', kind: 'gain' },
+  {
+    name: 'damper_invert', label: 'Invert damper', kind: 'bool',
+    help: 'Tick this if your damper opens at the smaller pulse width (Damper min) instead of the larger one. Saving moves the damper to match.',
+  },
+  { name: 'damper_minimum', label: 'Damper min', kind: 'whole' },
+  { name: 'damper_maximum', label: 'Damper max', kind: 'whole' },
+];
+const withFields = config => ({ ...config, fields: FIELD_TABLE.filter(({ name }) => name in config) });
+
+const baseConfig = {
   cs_pin: 20,
   clock_pin: 21,
   data_pin: 16,
@@ -16,6 +39,7 @@ const fullConfig = {
   damper_minimum: 500,
   damper_maximum: 2500,
 };
+const fullConfig = withFields(baseConfig);
 
 beforeEach(() => {
   fetch.resetMocks();
@@ -129,7 +153,7 @@ test('posts only the editable settings, not the read-only ones', () => {
 test('does not show or post blower_minimum, even if the server still sends it', () => {
   // older config.json files may still contain it; it was never used by the control loop
   renderWithStore(<Config />, {
-    preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config: { ...fullConfig, blower_minimum: 40 } } },
+    preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config: withFields({ ...baseConfig, blower_minimum: 40 }) } },
   });
   fetch.mockClear();
 
@@ -141,7 +165,7 @@ test('does not show or post blower_minimum, even if the server still sends it', 
 });
 
 describe('PID gains', () => {
-  const withGains = { ...fullConfig, pid_kp: 1, pid_ki: 0.1, pid_kd: 0.05 };
+  const withGains = withFields({ ...baseConfig, pid_kp: 1, pid_ki: 0.1, pid_kd: 0.05 });
   const renderWithGains = () => renderWithStore(<Config />, {
     preloadedState: { smokerpi: { graphData: [], graphIndex: 0, config: withGains } },
   });
@@ -212,7 +236,7 @@ describe('PID gains', () => {
 });
 
 describe('Damper invert', () => {
-  const withInvert = { ...fullConfig, damper_invert: false };
+  const withInvert = withFields({ ...baseConfig, damper_invert: false });
 
   beforeEach(() => {
     fetch.mockResponse(JSON.stringify(withInvert));

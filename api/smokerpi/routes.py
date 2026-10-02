@@ -3,7 +3,7 @@ import os
 from flask import Response, json, jsonify, request
 from werkzeug.exceptions import InternalServerError, NotFound
 
-from .config import Config, applyConfig, validateEditableConfig
+from .config import Config, applyConfig, describeFields, validateEditableConfig
 
 
 def registerRoutes(app, worker):
@@ -76,7 +76,7 @@ def registerRoutes(app, worker):
                 except Exception as e:
                     app.logger.exception('Could not move the damper after changing damper_invert')
                     return jsonify(error='Saved, but the damper could not be moved to match: %s' % e), 500
-        return json.dumps(publicConfig())
+        return json.dumps(dict(publicConfig(), fields=describeFields(app.smokerpi_config)))
 
     def control(action):
         """Run a control request: validate `enabled`, then call action(enabled). Every manual

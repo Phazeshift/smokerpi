@@ -9,40 +9,52 @@ from collections import namedtuple
 SERVO_MIN, SERVO_MAX = 500, 2500
 
 
-class Field(namedtuple('Field', 'name default kind low high')):
+class Field(namedtuple('Field', 'name default kind low high label help')):
     """One setting in config.json: its default, and how a POST /api/config may change it.
 
     kind is 'whole' (a required whole number between low and high, high None for no upper
     limit), 'gain' (an optional number from 0 to high, so a client that only knows the
     'whole' settings keeps working), 'bool' (optional), or None for settings the API does
-    not accept because they need a restart (pins, intervals): edit config.json for those."""
+    not accept because they need a restart (pins, intervals): edit config.json for those.
+
+    label (and optional help text) is what the Config page shows. A field with no label is
+    not sent to the page at all: secrets and settings that are not for display."""
     __slots__ = ()
 
-    def __new__(cls, name, default, kind=None, low=None, high=None):
-        return super().__new__(cls, name, default, kind, low, high)
+    def __new__(cls, name, default, kind=None, low=None, high=None, label=None, help=None):
+        return super().__new__(cls, name, default, kind, low, high, label, help)
 
 
 FIELDS = (
-    Field('cs_pin', 20),
-    Field('clock_pin', 21),
-    Field('data_pin', 16),
-    Field('blower_pin1', 26),
-    Field('blower_pin2', 19),
-    Field('damper_pin', 13),
-    Field('set_temperature', 105, 'whole', 1, None),
-    Field('graph_interval', 10),
+    Field('cs_pin', 20, label='Max CS Pin'),
+    Field('clock_pin', 21, label='Max Clock Pin'),
+    Field('data_pin', 16, label='Max Data Pin'),
+    Field('blower_pin1', 26, label='Blower pin 1'),
+    Field('blower_pin2', 19, label='Blower pin 2'),
+    Field('damper_pin', 13, label='Damper pin'),
+    Field('set_temperature', 105, 'whole', 1, None, label='Target temperature'),
+    Field('graph_interval', 10, label='Graph interval'),
     Field('worker_interval', 10),
     Field('sensor_timeout', 60),
     Field('password', ''),
     # PID gain limits are sanity limits, not tuning advice.
-    Field('pid_kp', 1, 'gain', 0, 100),
-    Field('pid_ki', 0.1, 'gain', 0, 10),
-    Field('pid_kd', 0.05, 'gain', 0, 100),
-    Field('damper_invert', False, 'bool'),
+    Field('pid_kp', 1, 'gain', 0, 100, label='PID Kp (proportional)'),
+    Field('pid_ki', 0.1, 'gain', 0, 10, label='PID Ki (integral, per second)'),
+    Field('pid_kd', 0.05, 'gain', 0, 100, label='PID Kd (derivative)'),
+    Field('damper_invert', False, 'bool', label='Invert damper',
+          help='Tick this if your damper opens at the smaller pulse width (Damper min) instead of '
+               'the larger one. Saving moves the damper to match.'),
     Field('history_max_mb', 5),
-    Field('damper_minimum', 500, 'whole', SERVO_MIN, SERVO_MAX),
-    Field('damper_maximum', 2500, 'whole', SERVO_MIN, SERVO_MAX),
+    Field('damper_minimum', 500, 'whole', SERVO_MIN, SERVO_MAX, label='Damper min'),
+    Field('damper_maximum', 2500, 'whole', SERVO_MIN, SERVO_MAX, label='Damper max'),
 )
+
+
+def describeFields(config):
+    """What the Config page needs to build its form from GET /api/config: the name, label,
+    kind and help of each labelled setting that is in the config."""
+    return [{'name': field.name, 'label': field.label, 'kind': field.kind, 'help': field.help}
+            for field in FIELDS if field.label and field.name in config]
 
 
 def _whole_number(value):
