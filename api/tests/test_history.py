@@ -149,22 +149,22 @@ def make_app(**overrides):
 def app():
     application = make_app()
     yield application
-    application.smokerpi_running = False
+    application.smoker.running = False
 
 
 class TestInTheApp:
     def test_each_graph_point_is_written_to_data_history_csv(self, app, tmp_path):
-        app.smokerpi_workerStep()
+        app.worker.step()
         rows = list(csv.DictReader((tmp_path / 'data' / 'history.csv').open()))
         assert len(rows) == 1
         assert float(rows[0]['target']) == 105
 
     def test_the_graph_survives_a_restart(self, app):
         for _ in range(3):
-            app.smokerpi_graphLast = 0                    # let every step record a point
-            app.smokerpi_workerStep()
+            app.smoker.graphLast = 0                    # let every step record a point
+            app.worker.step()
         before = json.loads(app.test_client().get('/api/graph').data)
-        app.smokerpi_running = False
+        app.smoker.running = False
 
         restarted = make_app()
         try:
@@ -172,36 +172,36 @@ class TestInTheApp:
             assert [p['t'] for p in after] == [p['t'] for p in before]
             assert len(after) == 3
             # and carries on numbering from there
-            restarted.smokerpi_graphLast = 0
-            restarted.smokerpi_workerStep()
+            restarted.smoker.graphLast = 0
+            restarted.worker.step()
             again = json.loads(restarted.test_client().get('/api/graph').data)
             assert [p['i'] for p in again] == [0, 1, 2, 3]
         finally:
-            restarted.smokerpi_running = False
+            restarted.smoker.running = False
 
     def test_a_browser_that_had_seen_thousands_of_points_still_gets_new_ones_after_a_restart(self, app):
         # point numbers used to restart from 0, which left an open tab (asking from its own
         # last number) waiting for hours. They now carry on from where the file left off.
-        app.smokerpi_graphIndex = 7000
+        app.smoker.graphIndex = 7000
         for _ in range(3):
-            app.smokerpi_graphLast = 0
-            app.smokerpi_workerStep()
-        app.smokerpi_running = False
+            app.smoker.graphLast = 0
+            app.worker.step()
+        app.smoker.running = False
 
         restarted = make_app()
         try:
-            restarted.smokerpi_workerStep()
+            restarted.worker.step()
             tab_is_at = 7003                      # the tab has seen points 7000-7002
             newer = json.loads(restarted.test_client().get('/api/graph?from=%d' % tab_is_at).data)
             assert [p['i'] for p in newer] == [7003]
             everything = json.loads(restarted.test_client().get('/api/graph?from=0').data)
             assert [p['i'] for p in everything] == [7000, 7001, 7002, 7003]
         finally:
-            restarted.smokerpi_running = False
+            restarted.smoker.running = False
 
     def test_only_the_most_recent_two_thousand_points_are_restored(self, app):
-        fill(app.smokerpi_history, 2500)
-        app.smokerpi_running = False
+        fill(app.smoker.history, 2500)
+        app.smoker.running = False
         restarted = make_app()
         try:
             graph = json.loads(restarted.test_client().get('/api/graph').data)
@@ -209,36 +209,36 @@ class TestInTheApp:
             assert graph[-1]['t'] == 100 + 2499
             assert (graph[0]['i'], graph[-1]['i']) == (500, 2499)
         finally:
-            restarted.smokerpi_running = False
+            restarted.smoker.running = False
 
     def test_a_history_failure_does_not_fail_the_step_or_lose_the_graph_point(self, app, tmp_path, caplog):
-        app.smokerpi_blower.on()
+        app.smoker.blower.on()
         blocker = tmp_path / 'blocker'
         blocker.write_text('a file where a directory is needed')
-        app.smokerpi_history = History(blocker / 'x' / 'history.csv')
+        app.smoker.history = History(blocker / 'x' / 'history.csv')
         caplog.clear()
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert len(app.smokerpi_graphData) == 1
-        assert app.smokerpi_blower.state == 100          # no fail-safe: the control loop was fine
+        assert len(app.smoker.graphData) == 1
+        assert app.smoker.blower.state == 100          # no fail-safe: the control loop was fine
         assert [r for r in caplog.records if 'Worker step failed' in r.getMessage()] == []
 
     def test_the_size_limit_comes_from_config(self):
         application = make_app(history_max_mb=0.5)
         try:
-            assert application.smokerpi_history.max_bytes == 524288
+            assert application.smoker.history.max_bytes == 524288
         finally:
-            application.smokerpi_running = False
+            application.smoker.running = False
 
     def test_the_default_limit_is_five_megabytes(self, app):
         assert Config(test=True).defaultConfig()['history_max_mb'] == 5
-        assert app.smokerpi_history.max_bytes == 5 * 1024 * 1024
+        assert app.smoker.history.max_bytes == 5 * 1024 * 1024
 
 
 class TestDownload:
     def test_serves_the_csv_as_an_attachment(self, app):
-        app.smokerpi_workerStep()
+        app.worker.step()
         response = app.test_client().get('/api/history.csv')
         assert response.status_code == 200
         assert response.mimetype == 'text/csv'
@@ -259,7 +259,7 @@ class TestDownload:
             token = base64.b64encode(b'x:pw').decode()
             assert client.get('/api/history.csv', headers={'Authorization': 'Basic ' + token}).status_code == 200
         finally:
-            application.smokerpi_running = False
+            application.smoker.running = False
 
 
 def test_the_path_is_fixed_when_created_so_a_later_directory_change_does_not_move_it(tmp_path, monkeypatch):

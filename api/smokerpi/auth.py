@@ -17,11 +17,11 @@ def passwordSupplied():
     return password if colon else None
 
 
-def registerAuth(app):
+def registerAuth(app, smoker):
     @app.before_request
     def requirePassword():
         # Protects the page and the API alike. With no password configured everything is open.
-        expected = app.smokerpi_config.get('password', '')
+        expected = smoker.config.get('password', '')
         if not expected:
             return None
         supplied = passwordSupplied()

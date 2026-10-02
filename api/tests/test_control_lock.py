@@ -33,11 +33,10 @@ class Recorder:
 
 def interleave(app, url, enabled):
     """Press a control while the worker is halfway through a step. Returns the response."""
-    app.smokerpi_pidRunning = True
-    app.smokerpi_pid.auto_mode = True
-    gate = GatedController(app.smokerpi_pitController)
-    app.smokerpi_pitController = gate
-    worker = threading.Thread(target=app.smokerpi_workerStep)
+    app.smoker.setAutomatic(True)
+    gate = GatedController(app.smoker.pitController)
+    app.smoker.pitController = gate
+    worker = threading.Thread(target=app.worker.step)
     worker.start()
     try:
         assert gate.entered.wait(5), 'the worker never reached the hardware'
@@ -58,18 +57,18 @@ class TestControlsDuringAWorkerStep:
     def test_turning_the_pid_off_leaves_the_blower_off(self, app):
         response = interleave(app, '/api/pid', False)
         assert response.status_code == 200
-        assert app.smokerpi_pidRunning is False
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.automatic is False
+        assert app.smoker.blower.state == 0
 
     def test_turning_the_blower_off_leaves_it_off(self, app):
         response = interleave(app, '/api/blower', False)
         assert response.status_code == 200
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
 
     def test_closing_the_damper_leaves_it_closed(self, app):
         response = interleave(app, '/api/damper', False)
         assert response.status_code == 200
-        assert app.smokerpi_damper.state == 0
+        assert app.smoker.damper.state == 0
 
 
 class TestALoopThatHoldsTheLock:
@@ -77,11 +76,11 @@ class TestALoopThatHoldsTheLock:
 
     @pytest.fixture
     def held(self, app):
-        app.smokerpi_lockTimeout = 0.1
+        app.smoker.lockTimeout = 0.1
         holder_has_it, done = threading.Event(), threading.Event()
 
         def hold():
-            with app.smokerpi_lock:
+            with app.smoker.lock:
                 holder_has_it.set()
                 done.wait(5)
 
@@ -97,14 +96,14 @@ class TestALoopThatHoldsTheLock:
         response = client.post(url, json={'enabled': True})
         assert response.status_code == 503
         assert 'control loop' in response.get_json()['error']
-        assert app.smokerpi_blower.state == 0
-        assert app.smokerpi_pidRunning is False
+        assert app.smoker.blower.state == 0
+        assert app.smoker.automatic is False
 
     def test_a_config_change_gives_up_with_a_503(self, app, client, held):
         response = client.post('/api/config', json={
             'set_temperature': 130, 'damper_minimum': 600, 'damper_maximum': 2400})
         assert response.status_code == 503
-        assert app.smokerpi_config['set_temperature'] != 130
+        assert app.smoker.config['set_temperature'] != 130
 
     def test_reading_the_state_does_not_wait_for_the_lock(self, client, held):
         assert client.get('/api/state').status_code == 200
@@ -116,16 +115,16 @@ class TestALoopThatHoldsTheLock:
 class TestShutdown:
     def test_cleanup_waits_for_a_step_in_progress(self, app):
         order = []
-        app.smokerpi_blower.cleanup = lambda: order.append('cleanup')
-        app.smokerpi_pidRunning = True
-        gate = GatedController(app.smokerpi_pitController)
+        app.smoker.blower.cleanup = lambda: order.append('cleanup')
+        app.smoker.setAutomatic(True)
+        gate = GatedController(app.smoker.pitController)
         gate.real = type('Last', (), {'set': lambda self, value: order.append('step')})()
-        app.smokerpi_pitController = gate
-        worker = threading.Thread(target=app.smokerpi_workerStep)
+        app.smoker.pitController = gate
+        worker = threading.Thread(target=app.worker.step)
         worker.start()
         assert gate.entered.wait(5)
 
-        cleanup = threading.Thread(target=app.cleanupHardware)
+        cleanup = threading.Thread(target=app.smoker.cleanup)
         cleanup.start()
         cleanup.join(0.3)
         gate.release.set()
@@ -135,22 +134,22 @@ class TestShutdown:
         assert order == ['step', 'cleanup']
 
     def test_no_step_moves_the_hardware_after_cleanup(self, app):
-        app.cleanupHardware()
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Recorder()
-        app.smokerpi_workerStep()
-        assert app.smokerpi_pitController.calls == []
+        app.smoker.cleanup()
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Recorder()
+        app.worker.step()
+        assert app.smoker.pitController.calls == []
 
     def test_cleanup_still_happens_if_the_loop_never_lets_go(self, app):
-        app.smokerpi_lockTimeout = 0.1
+        app.smoker.lockTimeout = 0.1
         cleaned = []
-        app.smokerpi_blower.cleanup = lambda: cleaned.append(True)
-        app.smokerpi_lock.acquire()
+        app.smoker.blower.cleanup = lambda: cleaned.append(True)
+        app.smoker.lock.acquire()
         try:
-            finished = threading.Thread(target=app.cleanupHardware)
+            finished = threading.Thread(target=app.smoker.cleanup)
             finished.start()
             finished.join(5)
             assert not finished.is_alive()
         finally:
-            app.smokerpi_lock.release()
+            app.smoker.lock.release()
         assert cleaned == [True]

@@ -35,9 +35,9 @@ class TestConfigEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['set_temperature'] == 130
-        assert app.smokerpi_pid.setpoint == 130
-        assert app.smokerpi_damper.min == 600
-        assert app.smokerpi_damper.max == 2400
+        assert app.smoker.pid.setpoint == 130
+        assert app.smoker.damper.min == 600
+        assert app.smoker.damper.max == 2400
 
     def test_post_persists_to_disk_without_touching_other_tests(self, tmp_path, monkeypatch):
         (tmp_path / 'log').mkdir()
@@ -54,48 +54,48 @@ class TestConfigEndpoint:
         assert (tmp_path / 'config.json').exists()
         saved = json.loads((tmp_path / 'config.json').read_text())
         assert saved['set_temperature'] == 140
-        application.smokerpi_running = False
+        application.smoker.running = False
 
 
 class TestBlowerEndpoint:
     def test_enabling_turns_blower_on(self, app, client):
         response = client.post('/api/blower', json={'enabled': True})
         assert response.status_code == 200
-        assert app.smokerpi_blower.state == 100
-        assert app.smokerpi_pidRunning is False
+        assert app.smoker.blower.state == 100
+        assert app.smoker.automatic is False
 
     def test_disabling_turns_blower_off(self, app, client):
         client.post('/api/blower', json={'enabled': True})
         client.post('/api/blower', json={'enabled': False})
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
 
 
 class TestDamperEndpoint:
     def test_enabling_opens_damper_fully(self, app, client):
         response = client.post('/api/damper', json={'enabled': True})
         assert response.status_code == 200
-        assert app.smokerpi_damper.state == 100
+        assert app.smoker.damper.state == 100
 
     def test_disabling_closes_damper(self, app, client):
         client.post('/api/damper', json={'enabled': True})
         client.post('/api/damper', json={'enabled': False})
-        assert app.smokerpi_damper.state == 0
+        assert app.smoker.damper.state == 0
 
 
 class TestPidEndpoint:
     def test_enabling_starts_pid(self, app, client):
         response = client.post('/api/pid', json={'enabled': True})
         assert response.status_code == 200
-        assert app.smokerpi_pidRunning is True
-        assert app.smokerpi_pid.auto_mode is True
+        assert app.smoker.automatic is True
+        assert app.smoker.pid.auto_mode is True
 
     def test_disabling_stops_pid_and_blower(self, app, client):
         client.post('/api/pid', json={'enabled': True})
-        app.smokerpi_blower.on()
+        app.smoker.blower.on()
         client.post('/api/pid', json={'enabled': False})
-        assert app.smokerpi_pidRunning is False
-        assert app.smokerpi_pid.auto_mode is False
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.automatic is False
+        assert app.smoker.pid.auto_mode is False
+        assert app.smoker.blower.state == 0
 
 
 class TestGraphEndpoint:
@@ -105,7 +105,7 @@ class TestGraphEndpoint:
         assert json.loads(response.data) == []
 
     def test_filters_by_from_index(self, app, client):
-        app.smokerpi_graphData = [
+        app.smoker.graphData = [
             {'i': 0, 't': 20},
             {'i': 1, 't': 21},
             {'i': 2, 't': 22},

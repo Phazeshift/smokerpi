@@ -85,7 +85,7 @@ class TestAcceptsValidConfig:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['set_temperature'] == 140 and isinstance(data['set_temperature'], int)
-        assert app.smokerpi_pid.setpoint == 140
+        assert app.smoker.pid.setpoint == 140
 
     def test_the_documented_limits_themselves_are_valid(self, client):
         response = client.post('/api/config', json=valid_payload(
@@ -133,7 +133,7 @@ class TestPidGains:
     def test_valid_gains_apply_to_the_running_controller(self, client, app):
         response = client.post('/api/config', json=valid_payload(pid_kp=5, pid_ki=0.005, pid_kd=0))
         assert response.status_code == 200
-        assert app.smokerpi_pid.tunings == (5.0, 0.005, 0.0)
+        assert app.smoker.pid.tunings == (5.0, 0.005, 0.0)
         data = json.loads(response.data)
         assert (data['pid_kp'], data['pid_ki'], data['pid_kd']) == (5.0, 0.005, 0.0)
 
@@ -141,7 +141,7 @@ class TestPidGains:
         # the web form sends strings
         response = client.post('/api/config', json=valid_payload(pid_kp='2.5', pid_ki=' 0.01 ', pid_kd='0'))
         assert response.status_code == 200
-        assert app.smokerpi_pid.tunings == (2.5, 0.01, 0.0)
+        assert app.smoker.pid.tunings == (2.5, 0.01, 0.0)
 
     def test_gains_are_saved_to_config_json(self, client, tmp_path):
         client.post('/api/config', json=valid_payload(pid_kp=5, pid_ki=0.005, pid_kd=0))
@@ -152,11 +152,11 @@ class TestPidGains:
         client.post('/api/config', json=valid_payload(pid_kp=5))
         response = client.post('/api/config', json=valid_payload())
         assert response.status_code == 200
-        assert app.smokerpi_pid.tunings[0] == 5.0
+        assert app.smoker.pid.tunings[0] == 5.0
 
     def test_a_partial_set_changes_only_the_ones_given(self, client, app):
         client.post('/api/config', json=valid_payload(pid_ki=0.02))
-        assert app.smokerpi_pid.tunings == (1, 0.02, 0.05)
+        assert app.smoker.pid.tunings == (1, 0.02, 0.05)
 
     @pytest.mark.parametrize('field,value', [
         ('pid_kp', ''), ('pid_kp', 'fast'), ('pid_kp', None), ('pid_kp', True), ('pid_kp', -1),
@@ -166,14 +166,14 @@ class TestPidGains:
     ])
     def test_invalid_gains_are_a_400_naming_the_field_and_change_nothing(self, client, app, field, value):
         before = current_config(client)
-        gains = app.smokerpi_pid.tunings
+        gains = app.smoker.pid.tunings
 
         response = client.post('/api/config', json=valid_payload(**{field: value}))
 
         assert response.status_code == 400
         assert field in json.loads(response.data)['errors']
         assert current_config(client) == before
-        assert app.smokerpi_pid.tunings == gains
+        assert app.smoker.pid.tunings == gains
 
     def test_one_bad_gain_stops_the_valid_settings_in_the_same_post_applying(self, client):
         before = current_config(client)
@@ -182,7 +182,7 @@ class TestPidGains:
 
     def test_zero_is_allowed(self, client, app):
         assert client.post('/api/config', json=valid_payload(pid_kp=0, pid_ki=0, pid_kd=0)).status_code == 200
-        assert app.smokerpi_pid.tunings == (0, 0, 0)
+        assert app.smoker.pid.tunings == (0, 0, 0)
 
 
 class FakeDamper:
@@ -208,24 +208,24 @@ class TestDamperInvert:
 
     def test_the_default_is_not_inverted(self, client, app):
         assert current_config(client)['damper_invert'] is False
-        assert app.smokerpi_damper.invert is False
+        assert app.smoker.damper.invert is False
 
     def test_setting_it_applies_saves_and_returns_it(self, client, app, tmp_path):
         response = client.post('/api/config', json=valid_payload(damper_invert=True))
         assert response.status_code == 200
         assert json.loads(response.data)['damper_invert'] is True
-        assert app.smokerpi_damper.invert is True
+        assert app.smoker.damper.invert is True
         assert json.loads((tmp_path / 'config.json').read_text())['damper_invert'] is True
 
     def test_it_can_be_turned_off_again(self, client, app):
         client.post('/api/config', json=valid_payload(damper_invert=True))
         client.post('/api/config', json=valid_payload(damper_invert=False))
-        assert app.smokerpi_damper.invert is False
+        assert app.smoker.damper.invert is False
 
     def test_omitting_it_leaves_it_alone(self, client, app):
         client.post('/api/config', json=valid_payload(damper_invert=True))
         client.post('/api/config', json=valid_payload())
-        assert app.smokerpi_damper.invert is True
+        assert app.smoker.damper.invert is True
 
     @pytest.mark.parametrize('value', ['yes', 'true', 1, 0, None, [True]])
     def test_anything_but_a_boolean_is_a_400_and_changes_nothing(self, client, app, value):
@@ -234,21 +234,21 @@ class TestDamperInvert:
         assert response.status_code == 400
         assert 'damper_invert' in json.loads(response.data)['errors']
         assert current_config(client) == before
-        assert app.smokerpi_damper.invert is False
+        assert app.smoker.damper.invert is False
 
     def test_changing_it_moves_the_damper_to_match(self, client, app):
-        app.smokerpi_damper = FakeDamper()
+        app.smoker.damper = FakeDamper()
         client.post('/api/config', json=valid_payload(damper_invert=True))
-        assert app.smokerpi_damper.repositioned == 1
+        assert app.smoker.damper.repositioned == 1
 
     def test_posting_the_same_value_does_not_move_the_damper(self, client, app):
-        app.smokerpi_damper = FakeDamper()
+        app.smoker.damper = FakeDamper()
         client.post('/api/config', json=valid_payload(damper_invert=False))
         client.post('/api/config', json=valid_payload())
-        assert app.smokerpi_damper.repositioned == 0
+        assert app.smoker.damper.repositioned == 0
 
     def test_a_failed_move_is_reported_but_the_setting_is_kept(self, client, app, tmp_path):
-        app.smokerpi_damper = FakeDamper(fail=True)
+        app.smoker.damper = FakeDamper(fail=True)
         response = client.post('/api/config', json=valid_payload(damper_invert=True))
         assert response.status_code == 500
         assert 'damper' in json.loads(response.data)['error'].lower()
@@ -262,9 +262,9 @@ class TestDamperInvert:
         config = dict(Config(test=True).defaultConfig(), damper_invert=True)
         app = create_app(test_config={'config': config, 'start_worker': False})
         try:
-            assert app.smokerpi_damper.invert is True
+            assert app.smoker.damper.invert is True
         finally:
-            app.smokerpi_running = False
+            app.smoker.running = False
 
 
 class TestFieldDescriptions:
@@ -288,11 +288,11 @@ class TestFieldDescriptions:
             assert name not in fields
 
     def test_only_describes_settings_the_config_has(self, app, client):
-        del app.smokerpi_config['pid_kp']
+        del app.smoker.config['pid_kp']
         assert 'pid_kp' not in self.fields(client)
 
     def test_a_leftover_setting_with_no_field_is_not_described(self, app, client):
-        app.smokerpi_config['blower_minimum'] = 40
+        app.smoker.config['blower_minimum'] = 40
         assert 'blower_minimum' not in self.fields(client)
 
     def test_the_post_response_has_them_too(self, client):

@@ -24,14 +24,14 @@ def basic(password, username='anyone'):
 def locked():
     application = make_app('s3cret')
     yield application
-    application.smokerpi_running = False
+    application.smoker.running = False
 
 
 @pytest.fixture
 def open_app():
     application = make_app('')
     yield application
-    application.smokerpi_running = False
+    application.smoker.running = False
 
 
 PROTECTED = [('get', '/'), ('get', '/api/state'), ('get', '/api/config'), ('get', '/api/graph'),
@@ -47,9 +47,9 @@ class TestPasswordSet:
         assert response.headers['WWW-Authenticate'].startswith('Basic')
 
     def test_a_refused_request_does_not_act(self, locked):
-        locked.smokerpi_blower.off()
+        locked.smoker.blower.off()
         locked.test_client().post('/api/blower', json={'enabled': True})
-        assert locked.smokerpi_blower.state == 0
+        assert locked.smoker.blower.state == 0
 
     def test_a_wrong_password_is_refused(self, locked):
         response = locked.test_client().get('/api/state', headers=basic('wrong'))
@@ -70,12 +70,12 @@ class TestPasswordSet:
         try:
             assert application.test_client().get('/api/state', headers=basic('pa:ss wörd')).status_code == 200
         finally:
-            application.smokerpi_running = False
+            application.smoker.running = False
 
     def test_controls_work_with_the_password(self, locked):
         response = locked.test_client().post('/api/blower', json={'enabled': True}, headers=basic('s3cret'))
         assert response.status_code == 200
-        assert locked.smokerpi_blower.state == 100
+        assert locked.smoker.blower.state == 100
 
 
 class TestNoPassword:
@@ -106,7 +106,7 @@ class TestPasswordIsNeverExposed:
     def test_it_cannot_be_changed_over_the_api(self, locked):
         locked.test_client().post('/api/config', headers=basic('s3cret'), json={
             'set_temperature': 120, 'damper_minimum': 500, 'damper_maximum': 2500, 'password': 'hacked'})
-        assert locked.smokerpi_config['password'] == 's3cret'
+        assert locked.smoker.config['password'] == 's3cret'
 
 
 class TestControlRequestValidation:
@@ -122,9 +122,9 @@ class TestControlRequestValidation:
         assert response.status_code == 400
 
     def test_a_bad_request_does_not_stop_the_pid(self, open_app):
-        open_app.smokerpi_pidRunning = True
+        open_app.smoker.setAutomatic(True)
         open_app.test_client().post('/api/blower', json={'enabled': 'yes'})
-        assert open_app.smokerpi_pidRunning is True
+        assert open_app.smoker.automatic is True
 
 
 def test_the_default_config_has_no_password():

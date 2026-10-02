@@ -46,16 +46,16 @@ def isolated_cwd(tmp_path, monkeypatch):
 def app():
     application = create_app(test_config={'config': Config(test=True).defaultConfig(), 'start_worker': False})
     yield application
-    application.smokerpi_running = False
+    application.smoker.running = False
 
 
 class Clock:
     """Replaces the app's clock so tests can move time without sleeping."""
     def __init__(self, app):
         self.now = 1000.0
-        app.smokerpi_clock = lambda: self.now
-        app.smokerpi_lastReading = self.now
-        app.smokerpi_lastPass = self.now
+        app.smoker.clock = lambda: self.now
+        app.worker.lastReading = self.now
+        app.worker.lastPass = self.now
 
     def advance(self, seconds):
         self.now += seconds
@@ -79,78 +79,78 @@ def errors(caplog):
 
 class TestOneStep:
     def test_a_normal_step_runs_cleanly_and_records_a_graph_point(self, app, caplog):
-        app.smokerpi_workerStep()
+        app.worker.step()
         assert errors(caplog) == []
-        assert len(app.smokerpi_graphData) == 1
+        assert len(app.smoker.graphData) == 1
 
     def test_a_failing_pid_step_is_logged_and_does_not_raise(self, app, caplog):
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Exploding('damper boom')
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Exploding('damper boom')
 
-        app.smokerpi_workerStep()          # must not raise
+        app.worker.step()          # must not raise
 
         assert 'damper boom' in caplog.text
         assert 'PID update' in caplog.text
 
     def test_the_loop_keeps_working_once_the_fault_clears(self, app):
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Exploding()
-        app.smokerpi_workerStep()
-        app.smokerpi_pitController = Recorder()
-        app.smokerpi_workerStep()
-        assert len(app.smokerpi_pitController.calls) == 1
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Exploding()
+        app.worker.step()
+        app.smoker.pitController = Recorder()
+        app.worker.step()
+        assert len(app.smoker.pitController.calls) == 1
 
 
 class TestFailingSafe:
     def test_a_failing_pid_step_switches_the_blower_off(self, app):
-        app.smokerpi_blower.on()
-        assert app.smokerpi_blower.state == 100
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Exploding()
+        app.smoker.blower.on()
+        assert app.smoker.blower.state == 100
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Exploding()
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
 
     def test_a_sensor_that_has_been_silent_too_long_switches_the_blower_off(self, app, caplog):
-        app.smokerpi_blower.on()
-        app.smokerpi_max31855 = Exploding('spi boom')
+        app.smoker.blower.on()
+        app.smoker.thermocouple = Exploding('spi boom')
         clock = Clock(app)
 
-        clock.advance(app.smokerpi_config['sensor_timeout'])
-        app.smokerpi_workerStep()
+        clock.advance(app.smoker.config['sensor_timeout'])
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
         assert 'spi boom' in caplog.text
 
     def test_the_pid_does_not_act_once_the_sensor_has_timed_out(self, app):
-        app.smokerpi_max31855 = Exploding()
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Recorder()
+        app.smoker.thermocouple = Exploding()
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Recorder()
         clock = Clock(app)
 
-        clock.advance(app.smokerpi_config['sensor_timeout'])
-        app.smokerpi_workerStep()
+        clock.advance(app.smoker.config['sensor_timeout'])
+        app.worker.step()
 
-        assert app.smokerpi_pitController.calls == []
+        assert app.smoker.pitController.calls == []
 
     def test_failing_to_switch_the_blower_off_is_survived_and_logged(self, app, caplog):
-        app.smokerpi_blower = Exploding('relay boom')
-        app.smokerpi_max31855 = Exploding()
+        app.smoker.blower = Exploding('relay boom')
+        app.smoker.thermocouple = Exploding()
         clock = Clock(app)
 
-        clock.advance(app.smokerpi_config['sensor_timeout'])
-        app.smokerpi_workerStep()          # must not raise
+        clock.advance(app.smoker.config['sensor_timeout'])
+        app.worker.step()          # must not raise
 
         assert 'relay boom' in caplog.text
 
     def test_a_graph_problem_is_logged_but_leaves_the_blower_alone(self, app, caplog):
-        app.smokerpi_blower.on()
-        app.smokerpi_graphData = None      # graphData() will fail on .append
+        app.smoker.blower.on()
+        app.smoker.graphData = None      # graphData() will fail on .append
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 100
+        assert app.smoker.blower.state == 100
         assert 'graph update' in caplog.text
 
 
@@ -160,103 +160,103 @@ class TestSensorDropouts:
 
     @pytest.fixture
     def sensor(self, app):
-        app.smokerpi_max31855 = Flaky()
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Recorder()
-        return app.smokerpi_max31855
+        app.smoker.thermocouple = Flaky()
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Recorder()
+        return app.smoker.thermocouple
 
     def test_the_default_timeout_is_sixty_seconds(self, app):
-        assert app.smokerpi_config['sensor_timeout'] == 60
+        assert app.smoker.config['sensor_timeout'] == 60
 
     @pytest.mark.parametrize('error', [MAX31855Error('No Connection'), OSError('spi boom')])
     def test_one_missed_read_leaves_the_blower_and_pid_alone(self, app, sensor, error):
         sensor.error = error
         clock = Clock(app)
-        app.smokerpi_workerStep()
-        app.smokerpi_blower.on()
+        app.worker.step()
+        app.smoker.blower.on()
         sensor.failing = True
         clock.advance(10)
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 100
-        assert len(app.smokerpi_pitController.calls) == 2       # the PID still ran
+        assert app.smoker.blower.state == 100
+        assert len(app.smoker.pitController.calls) == 2       # the PID still ran
 
     def test_the_pid_carries_on_with_the_last_good_reading(self, app, sensor):
         clock = Clock(app)
-        app.smokerpi_workerStep()
+        app.worker.step()
         sensor.failing = True
         clock.advance(10)
-        app.smokerpi_workerStep()
-        assert app.smokerpi_currentTemperature == 150.0
+        app.worker.step()
+        assert app.smoker.temperature == 150.0
 
     def test_a_missed_read_is_logged_as_a_warning_not_an_error(self, app, sensor, caplog):
         clock = Clock(app)
         sensor.failing = True
         clock.advance(10)
-        app.smokerpi_workerStep()
+        app.worker.step()
         assert errors(caplog) == []
         assert 'No Connection' in caplog.text
 
     def test_the_blower_stays_on_just_before_the_timeout(self, app, sensor):
         clock = Clock(app)
-        app.smokerpi_workerStep()
-        app.smokerpi_blower.on()
+        app.worker.step()
+        app.smoker.blower.on()
         sensor.failing = True
-        clock.advance(app.smokerpi_config['sensor_timeout'] - 1)
+        clock.advance(app.smoker.config['sensor_timeout'] - 1)
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 100
+        assert app.smoker.blower.state == 100
 
     def test_the_blower_goes_off_once_the_sensor_has_been_silent_for_the_timeout(self, app, sensor):
         clock = Clock(app)
-        app.smokerpi_workerStep()
-        app.smokerpi_blower.on()
+        app.worker.step()
+        app.smoker.blower.on()
         sensor.failing = True
         for _ in range(6):
             clock.advance(10)
-            app.smokerpi_workerStep()
+            app.worker.step()
 
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
 
     def test_a_good_read_restarts_the_timer(self, app, sensor):
         clock = Clock(app)
         sensor.failing = True
         clock.advance(50)
-        app.smokerpi_workerStep()
+        app.worker.step()
         sensor.failing = False
-        app.smokerpi_workerStep()              # recovers at t=50
+        app.worker.step()              # recovers at t=50
         sensor.failing = True
         clock.advance(50)                      # 50s since the good read, 100s since start
-        app.smokerpi_blower.on()
+        app.smoker.blower.on()
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 100
+        assert app.smoker.blower.state == 100
 
     def test_control_resumes_when_the_sensor_comes_back(self, app, sensor):
         clock = Clock(app)
         sensor.failing = True
-        clock.advance(app.smokerpi_config['sensor_timeout'])
-        app.smokerpi_workerStep()
-        assert app.smokerpi_pitController.calls == []
+        clock.advance(app.smoker.config['sensor_timeout'])
+        app.worker.step()
+        assert app.smoker.pitController.calls == []
 
         sensor.failing = False
         clock.advance(10)
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert len(app.smokerpi_pitController.calls) == 1
+        assert len(app.smoker.pitController.calls) == 1
 
     def test_a_sensor_that_never_works_times_out_from_startup(self, app, sensor):
         clock = Clock(app)
         sensor.failing = True
-        app.smokerpi_blower.on()
-        clock.advance(app.smokerpi_config['sensor_timeout'])
+        app.smoker.blower.on()
+        clock.advance(app.smoker.config['sensor_timeout'])
 
-        app.smokerpi_workerStep()
+        app.worker.step()
 
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
 
 
 class TestWorkerHealth:
@@ -267,50 +267,50 @@ class TestWorkerHealth:
         return json.loads(app.test_client().get('/api/state').data)['workerError']
 
     def test_no_error_when_every_step_works(self, app):
-        app.smokerpi_workerStep()
+        app.worker.step()
         assert self.workerError(app) is None
 
     def test_a_failing_pid_step_is_reported_with_its_message(self, app):
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Exploding('damper boom')
-        app.smokerpi_workerStep()
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Exploding('damper boom')
+        app.worker.step()
         assert 'PID update' in self.workerError(app)
         assert 'damper boom' in self.workerError(app)
 
     def test_a_missed_read_within_the_timeout_is_not_reported(self, app):
-        app.smokerpi_max31855 = Flaky()
-        app.smokerpi_max31855.failing = True
+        app.smoker.thermocouple = Flaky()
+        app.smoker.thermocouple.failing = True
         clock = Clock(app)
         clock.advance(10)
-        app.smokerpi_workerStep()
+        app.worker.step()
         assert self.workerError(app) is None
 
     def test_a_sensor_timeout_is_reported(self, app):
-        app.smokerpi_max31855 = Flaky()
-        app.smokerpi_max31855.failing = True
+        app.smoker.thermocouple = Flaky()
+        app.smoker.thermocouple.failing = True
         clock = Clock(app)
-        clock.advance(app.smokerpi_config['sensor_timeout'])
-        app.smokerpi_workerStep()
+        clock.advance(app.smoker.config['sensor_timeout'])
+        app.worker.step()
         assert 'temperature read' in self.workerError(app)
 
     def test_the_error_clears_when_the_fault_clears(self, app):
-        app.smokerpi_pidRunning = True
-        app.smokerpi_pitController = Exploding()
-        app.smokerpi_workerStep()
-        app.smokerpi_pitController = Recorder()
-        app.smokerpi_workerStep()
+        app.smoker.setAutomatic(True)
+        app.smoker.pitController = Exploding()
+        app.worker.step()
+        app.smoker.pitController = Recorder()
+        app.worker.step()
         assert self.workerError(app) is None
 
     def test_a_loop_that_has_stopped_running_is_reported(self, app):
         clock = Clock(app)
-        app.smokerpi_workerStep()
+        app.worker.step()
         clock.advance(120)                 # no pass for two minutes
         assert 'stopped' in self.workerError(app)
 
     def test_a_pass_after_a_long_gap_clears_the_stopped_report(self, app):
         clock = Clock(app)
         clock.advance(120)
-        app.smokerpi_workerStep()
+        app.worker.step()
         assert self.workerError(app) is None
 
 
@@ -320,58 +320,58 @@ class TestWatchdog:
 
     def test_a_stalled_loop_switches_the_blower_off(self, app, caplog):
         clock = Clock(app)
-        app.smokerpi_workerStep()
-        app.smokerpi_blower.on()
+        app.worker.step()
+        app.smoker.blower.on()
         clock.advance(120)
 
-        app.smokerpi_watchdogCheck()
+        app.worker.checkWatchdog()
 
-        assert app.smokerpi_blower.state == 0
+        assert app.smoker.blower.state == 0
         assert any('stopped' in r.getMessage() for r in errors(caplog))
 
     def test_a_running_loop_is_left_alone(self, app, caplog):
         clock = Clock(app)
-        app.smokerpi_workerStep()
-        app.smokerpi_blower.on()
+        app.worker.step()
+        app.smoker.blower.on()
         clock.advance(10)
 
-        app.smokerpi_watchdogCheck()
+        app.worker.checkWatchdog()
 
-        assert app.smokerpi_blower.state == 100
+        assert app.smoker.blower.state == 100
         assert errors(caplog) == []
 
     def test_it_does_not_wait_for_the_control_lock(self, app):
         # A stuck worker is usually stuck holding the lock.
         clock = Clock(app)
-        app.smokerpi_blower.on()
+        app.smoker.blower.on()
         clock.advance(120)
-        app.smokerpi_lock.acquire()
+        app.smoker.lock.acquire()
         try:
-            check = threading.Thread(target=app.smokerpi_watchdogCheck)
+            check = threading.Thread(target=app.worker.checkWatchdog)
             check.start()
             check.join(2)
             assert not check.is_alive(), 'the watchdog waited for the lock'
         finally:
-            app.smokerpi_lock.release()
-        assert app.smokerpi_blower.state == 0
+            app.smoker.lock.release()
+        assert app.smoker.blower.state == 0
 
     def test_it_logs_once_per_stall(self, app, caplog):
         clock = Clock(app)
         clock.advance(120)
-        app.smokerpi_watchdogCheck()
-        app.smokerpi_watchdogCheck()
+        app.worker.checkWatchdog()
+        app.worker.checkWatchdog()
         assert len(errors(caplog)) == 1
 
-        app.smokerpi_workerStep()          # the loop recovers
+        app.worker.step()          # the loop recovers
         clock.advance(120)                 # and stalls again
-        app.smokerpi_watchdogCheck()
+        app.worker.checkWatchdog()
         assert len(errors(caplog)) == 2
 
     def test_a_failing_blower_is_survived_and_logged(self, app, caplog):
         clock = Clock(app)
-        app.smokerpi_blower = Exploding('relay boom')
+        app.smoker.blower = Exploding('relay boom')
         clock.advance(120)
-        app.smokerpi_watchdogCheck()       # must not raise
+        app.worker.checkWatchdog()       # must not raise
         assert 'relay boom' in caplog.text
 
 
@@ -388,38 +388,38 @@ class TestTheThread:
                 release.wait(10)
 
         try:
-            application.smokerpi_pitController = Hanging()
-            application.smokerpi_pidRunning = True
+            application.smoker.pitController = Hanging()
+            application.smoker.setAutomatic(True)
             assert stuck.wait(5), 'the worker never reached the hardware'
-            application.smokerpi_blower.on()
+            application.smoker.blower.on()
             # Jump past the stall limit rather than wait 30 seconds.
-            application.smokerpi_clock = lambda: time.monotonic() + 1000
+            application.smoker.clock = lambda: time.monotonic() + 1000
 
             deadline = time.time() + 5
-            while application.smokerpi_blower.state != 0 and time.time() < deadline:
+            while application.smoker.blower.state != 0 and time.time() < deadline:
                 time.sleep(0.02)
 
-            assert application.smokerpi_blower.state == 0
-            assert application.watchdog.is_alive()
+            assert application.smoker.blower.state == 0
+            assert application.worker.watchdogThread.is_alive()
         finally:
-            application.smokerpi_running = False
+            application.smoker.running = False
             release.set()
-            application.worker.join(2)
-            application.watchdog.join(2)
+            application.worker.thread.join(2)
+            application.worker.watchdogThread.join(2)
 
     def test_the_worker_thread_survives_repeated_failures(self):
         config = dict(Config(test=True).defaultConfig(), worker_interval=0.02, graph_interval=0.02)
         application = create_app(test_config={'config': config, 'start_worker': True})
         try:
             failing = Exploding()
-            application.smokerpi_pidRunning = True
-            application.smokerpi_pitController = failing
+            application.smoker.setAutomatic(True)
+            application.smoker.pitController = failing
             deadline = time.time() + 5
             while failing.calls < 4 and time.time() < deadline:
                 time.sleep(0.02)
 
             assert failing.calls >= 4, 'the loop stopped calling the failing step'
-            assert application.worker.is_alive()
+            assert application.worker.thread.is_alive()
         finally:
-            application.smokerpi_running = False
-            application.worker.join(2)
+            application.smoker.running = False
+            application.worker.thread.join(2)

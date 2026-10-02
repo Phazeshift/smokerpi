@@ -19,7 +19,7 @@ def stop():
     apps = []
     yield apps.append
     for app in apps:
-        app.smokerpi_running = False
+        app.smoker.running = False
 
 
 def post_config(app):
@@ -32,7 +32,7 @@ class TestDefaultHome:
     def test_is_the_directory_the_app_started_in(self, tmp_path, stop):
         app = make_app()
         stop(app)
-        assert app.smokerpi_home == str(tmp_path)
+        assert app.smoker.home == str(tmp_path)
         assert (tmp_path / 'config.json').exists()
         assert (tmp_path / 'log' / 'app.log').exists()
 
@@ -60,9 +60,9 @@ class TestSmokerpiHome:
     def test_config_log_and_history_all_go_there(self, tmp_path, home, stop):
         app = make_app()
         stop(app)
-        app.smokerpi_workerStep()        # records a graph point, so the history file is written
+        app.worker.step()        # records a graph point, so the history file is written
 
-        assert app.smokerpi_home == str(home)
+        assert app.smoker.home == str(home)
         assert (home / 'config.json').exists()
         assert (home / 'log' / 'app.log').exists()
         assert (home / 'data' / 'history.csv').exists()
@@ -79,12 +79,12 @@ class TestSmokerpiHome:
         (home / 'config.json').write_text(json.dumps({'set_temperature': 77}))
         app = make_app()
         stop(app)
-        assert app.smokerpi_config['set_temperature'] == 77
+        assert app.smoker.config['set_temperature'] == 77
 
     def test_a_relative_value_is_made_absolute_at_startup(self, tmp_path, monkeypatch, stop):
         (tmp_path / 'rel').mkdir()
         monkeypatch.setenv('SMOKERPI_HOME', 'rel')
         app = make_app()
         stop(app)
-        assert app.smokerpi_home == str(tmp_path / 'rel')
-        assert os.path.isabs(app.smokerpi_home)
+        assert app.smoker.home == str(tmp_path / 'rel')
+        assert os.path.isabs(app.smoker.home)
