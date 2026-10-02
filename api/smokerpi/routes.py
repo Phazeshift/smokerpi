@@ -3,7 +3,7 @@ import os
 from flask import Response, json, jsonify, request
 from werkzeug.exceptions import InternalServerError, NotFound
 
-from .config import Config, applyConfig, describeFields, validateEditableConfig
+from .config import applyConfig, describeFields, validateEditableConfig
 
 
 def registerRoutes(app, worker):
@@ -84,7 +84,7 @@ def registerRoutes(app, worker):
             def save():
                 app.smokerpi_config.update(values)
                 invertChanged = applyConfig(app)
-                Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
+                app.smokerpi_configFile.saveConfig(app.smokerpi_config)
                 if invertChanged:
                     # Move the damper to the mirrored position now; the PID would not re-send an
                     # unchanged position. The setting is kept either way.

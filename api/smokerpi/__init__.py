@@ -17,8 +17,8 @@ import time
 import os
 
 
-def configureLogging():
-    """Log to ./log/app.log, capped at 4 x 1 MB so it cannot fill the Pi's SD card.
+def configureLogging(logDir):
+    """Log to <logDir>/app.log, capped at 4 x 1 MB so it cannot fill the Pi's SD card.
 
     Replaces any handler a previous call added, so creating the app more than once (as the
     tests do) does not log every line twice."""
@@ -26,7 +26,7 @@ def configureLogging():
     for old in [h for h in root.handlers if getattr(h, 'smokerpi', False)]:
         root.removeHandler(old)
         old.close()
-    handler = RotatingFileHandler('./log/app.log', maxBytes=1024 * 1024, backupCount=3)
+    handler = RotatingFileHandler(os.path.join(logDir, 'app.log'), maxBytes=1024 * 1024, backupCount=3)
     handler.smokerpi = True
     handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
     root.addHandler(handler)
@@ -46,8 +46,13 @@ def readVersion(path=os.path.join(os.path.dirname(__file__), '..', '..', 'VERSIO
 def create_app(test_config=None):
     app = Flask(__name__, static_folder='../../build', static_url_path='/')
 
-    os.makedirs('./log', exist_ok=True)
-    configureLogging()
+    # config.json, log/ and data/ all live here: SMOKERPI_HOME, or the directory the app was
+    # started from (api/ on the Pi, where runserver.sh runs it). Made absolute once, so a later
+    # change of working directory cannot split them up.
+    app.smokerpi_home = os.path.abspath(os.environ.get('SMOKERPI_HOME') or os.getcwd())
+    logDir = os.path.join(app.smokerpi_home, 'log')
+    os.makedirs(logDir, exist_ok=True)
+    configureLogging(logDir)
 
     app.logger.info("### NEW STARTUP Version %s", readVersion())
 
@@ -75,6 +80,7 @@ def create_app(test_config=None):
     app.smokerpi_lastPass = app.smokerpi_clock()
     app.smokerpi_stepErrors = {}
     app.smokerpi_config = { }
+    app.smokerpi_configFile = Config(app.smokerpi_test, os.path.join(app.smokerpi_home, 'config.json'))
 
     def configure():
         config = app.smokerpi_config
@@ -94,12 +100,12 @@ def create_app(test_config=None):
         if test_config is not None and 'config' in test_config:
             app.smokerpi_config = test_config['config']
         else:
-            app.smokerpi_config = Config(app.smokerpi_test).loadConfig()
+            app.smokerpi_config = app.smokerpi_configFile.loadConfig()
         app.smokerpi_workerInterval = app.smokerpi_config['worker_interval']
         configure()
         # The graph survives a restart: its points are kept in data/history.csv (next to config.json
         # and log/, which update.sh leaves alone), and the newest are loaded back here, keeping their point numbers so the numbering carries on.
-        app.smokerpi_history = History(os.path.join('data', 'history.csv'),
+        app.smokerpi_history = History(os.path.join(app.smokerpi_home, 'data', 'history.csv'),
                                        int(float(app.smokerpi_config.get('history_max_mb', 5)) * 1024 * 1024))
         app.smokerpi_graphData = app.smokerpi_history.recent(GRAPH_POINTS)
         app.smokerpi_graphIndex = app.smokerpi_graphData[-1]['i'] + 1 if app.smokerpi_graphData else 0

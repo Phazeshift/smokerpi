@@ -148,9 +148,12 @@ def applyConfig(app):
     return invertChanged
 
 
-class Config:    
-    def __init__(self, test):
+class Config:
+    def __init__(self, test, path='config.json'):
+        # create_app passes an absolute path in the app's home directory; the default,
+        # relative to the working directory, is for scripts and tests.
         self.test = test
+        self.path = path
 
     def applyTestConfig(self, data):
         if (self.test):     
@@ -173,7 +176,7 @@ class Config:
 
     def readConfigFile(self):
         try:
-            with open('config.json') as configfile:
+            with open(self.path) as configfile:
                 return json.load(configfile)
         except (FileNotFoundError):
             return {}
@@ -188,7 +191,7 @@ class Config:
         return defaultdata
 
     def writeConfigFile(self, data):
-        with open('config.json', 'w') as configfile:
+        with open(self.path, 'w') as configfile:
             json.dump(data, configfile)
 
     def defaultConfig(self):
