@@ -4,34 +4,32 @@ import * as actions from './actions/actions';
 import { Container, Button, Form } from 'react-bootstrap';
 import { FormInput } from './forminput'
 
-// The settings the API accepts (see FIELDS in api/smokerpi/config.py).
-const EDITABLE_FIELDS = [
-  { name: 'set_temperature', label: 'Target temperature' },
-  { name: 'damper_minimum', label: 'Damper min' },
-  { name: 'damper_maximum', label: 'Damper max' },
+// Every setting the page knows how to show; see FIELDS in api/smokerpi/config.py for the
+// server side. The server's keys decide what is on the page: a whole number is always
+// shown (the server needs it), every other field only if the server sent it, and a key
+// not listed here is not shown. kind says how it is edited and checked:
+//   whole  a required whole number    gain  a number, 0 or more    bool  a checkbox
+//   null   read-only: the API ignores it because it needs a restart (edit config.json on the Pi)
+const FIELDS = [
+  { name: 'set_temperature', label: 'Target temperature', kind: 'whole' },
+  { name: 'damper_minimum', label: 'Damper min', kind: 'whole' },
+  { name: 'damper_maximum', label: 'Damper max', kind: 'whole' },
+  { name: 'damper_invert', label: 'Invert damper', kind: 'bool' },
+  { name: 'pid_kp', label: 'PID Kp (proportional)', kind: 'gain' },
+  { name: 'pid_ki', label: 'PID Ki (integral, per second)', kind: 'gain' },
+  { name: 'pid_kd', label: 'PID Kd (derivative)', kind: 'gain' },
+  { name: 'graph_interval', label: 'Graph interval', kind: null },
+  { name: 'cs_pin', label: 'Max CS Pin', kind: null },
+  { name: 'clock_pin', label: 'Max Clock Pin', kind: null },
+  { name: 'data_pin', label: 'Max Data Pin', kind: null },
+  { name: 'blower_pin1', label: 'Blower pin 1', kind: null },
+  { name: 'blower_pin2', label: 'Blower pin 2', kind: null },
+  { name: 'damper_pin', label: 'Damper pin', kind: null },
 ];
 
-// The PID gains (see FIELDS in api/smokerpi/config.py). Only shown and posted when the
-// server sends them, so the page still works against a server that does not know them.
-const PID_FIELDS = [
-  { name: 'pid_kp', label: 'PID Kp (proportional)' },
-  { name: 'pid_ki', label: 'PID Ki (integral, per second)' },
-  { name: 'pid_kd', label: 'PID Kd (derivative)' },
-];
-
-const pidFieldsIn = config => PID_FIELDS.filter(({ name }) => config[name] !== undefined);
-
-// Shown for information only: the API ignores these, because they need a restart to take
-// effect. They live in config.json on the Pi.
-const READ_ONLY_FIELDS = [
-  { name: 'graph_interval', label: 'Graph interval' },
-  { name: 'cs_pin', label: 'Max CS Pin' },
-  { name: 'clock_pin', label: 'Max Clock Pin' },
-  { name: 'data_pin', label: 'Max Data Pin' },
-  { name: 'blower_pin1', label: 'Blower pin 1' },
-  { name: 'blower_pin2', label: 'Blower pin 2' },
-  { name: 'damper_pin', label: 'Damper pin' },
-];
+// The fields to show for this config, of the given kinds.
+const fieldsIn = (config, ...kinds) =>
+  FIELDS.filter(({ name, kind }) => kinds.includes(kind) && (kind === 'whole' || config[name] !== undefined));
 
 const isWholeNumber = value => /^\s*-?\d+\s*$/.test(String(value));
 const isNumber = value => /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/.test(String(value));
@@ -39,21 +37,15 @@ const isNumber = value => /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/.test(S
 // Ranges are checked by the server, which explains any rejection in the error banner.
 const validate = config => {
   const errors = {};
-  EDITABLE_FIELDS.forEach(({ name }) => {
+  fieldsIn(config, 'whole', 'gain').forEach(({ name, kind }) => {
     const value = config[name];
     if (value === undefined || value === null || String(value).trim() === '') {
       errors[name] = 'Enter value';
-    } else if (!isWholeNumber(value)) {
+    } else if (kind === 'whole' && !isWholeNumber(value)) {
       errors[name] = 'Enter a whole number';
-    }
-  });
-  pidFieldsIn(config).forEach(({ name }) => {
-    const value = config[name];
-    if (value === null || String(value).trim() === '') {
-      errors[name] = 'Enter value';
-    } else if (!isNumber(value)) {
+    } else if (kind === 'gain' && !isNumber(value)) {
       errors[name] = 'Enter a number';
-    } else if (Number(value) < 0) {
+    } else if (kind === 'gain' && Number(value) < 0) {
       errors[name] = 'Enter a number, 0 or more';
     }
   });
@@ -87,11 +79,9 @@ const Config = () => {
     setErrors(newErrors);
     if (Object.keys(newErrors).length === 0) {
       const editable = {};
-      EDITABLE_FIELDS.forEach(({ name }) => { editable[name] = config[name]; });
-      pidFieldsIn(config).forEach(({ name }) => { editable[name] = config[name]; });
-      if (config.damper_invert !== undefined) {
-        editable.damper_invert = !!config.damper_invert;
-      }
+      fieldsIn(config, 'whole', 'gain', 'bool').forEach(({ name, kind }) => {
+        editable[name] = kind === 'bool' ? !!config[name] : config[name];
+      });
       dispatch(actions.updateConfig(editable));
     }
   };
@@ -124,8 +114,8 @@ const Config = () => {
     <Container>
       <h2>Config</h2>
       <Form>
-        {renderFields(EDITABLE_FIELDS)}
-        {config.damper_invert !== undefined && (
+        {renderFields(fieldsIn(config, 'whole'))}
+        {fieldsIn(config, 'bool').length > 0 && (
           <Form.Group className="mb-3">
             <Form.Check
               type="checkbox"
@@ -141,7 +131,7 @@ const Config = () => {
             </Form.Text>
           </Form.Group>
         )}
-        {pidFieldsIn(config).length > 0 && (
+        {fieldsIn(config, 'gain').length > 0 && (
           <>
             <h5 className="mt-4">PID tuning</h5>
             <p className="text-muted">
@@ -149,7 +139,7 @@ const Config = () => {
               integral. Larger Kp and much smaller Ki suit a smoker: Kp 5, Ki 0.005, Kd 0 is a starting
               point to try, not a tested setting.
             </p>
-            {renderFields(pidFieldsIn(config))}
+            {renderFields(fieldsIn(config, 'gain'))}
           </>
         )}
       </Form>
@@ -159,7 +149,7 @@ const Config = () => {
       <p className="text-muted">
         These can't be changed here. Edit config.json on the Pi and restart SmokerPi to change them.
       </p>
-      <Form>{renderFields(READ_ONLY_FIELDS, { disabled: true })}</Form>
+      <Form>{renderFields(fieldsIn(config, null), { disabled: true })}</Form>
     </Container>
   );
 };

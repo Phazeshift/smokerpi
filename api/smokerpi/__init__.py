@@ -32,13 +32,23 @@ def configureLogging():
     root.setLevel(logging.INFO)
 
 
+def readVersion(path=os.path.join(os.path.dirname(__file__), '..', '..', 'VERSION')):
+    """The release the Pi is running: update.sh writes its tag to VERSION in the install
+    directory, next to api/. A checkout has no such file."""
+    try:
+        with open(path) as versionfile:
+            return versionfile.read().strip() or 'unknown'
+    except OSError:
+        return 'unknown'
+
+
 def create_app(test_config=None):
     app = Flask(__name__, static_folder='../../build', static_url_path='/')
 
     os.makedirs('./log', exist_ok=True)
     configureLogging()
 
-    app.logger.info("### NEW STARTUP Version 0.1")
+    app.logger.info("### NEW STARTUP Version %s", readVersion())
 
     app.smokerpi_test = platform.system() == 'Windows' or os.environ.get('SMOKERPI_TEST') == '1'
     app.smokerpi_currentTemperature = 0
