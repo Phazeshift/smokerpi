@@ -4,14 +4,14 @@ import * as actions from './actions/actions';
 import { Container, Button, Form } from 'react-bootstrap';
 import { FormInput } from './forminput'
 
-// The settings the API accepts (see EDITABLE_FIELDS in api/smokerpi/config.py).
+// The settings the API accepts (see FIELDS in api/smokerpi/config.py).
 const EDITABLE_FIELDS = [
   { name: 'set_temperature', label: 'Target temperature' },
   { name: 'damper_minimum', label: 'Damper min' },
   { name: 'damper_maximum', label: 'Damper max' },
 ];
 
-// The PID gains (see PID_FIELDS in api/smokerpi/config.py). Only shown and posted when the
+// The PID gains (see FIELDS in api/smokerpi/config.py). Only shown and posted when the
 // server sends them, so the page still works against a server that does not know them.
 const PID_FIELDS = [
   { name: 'pid_kp', label: 'PID Kp (proportional)' },

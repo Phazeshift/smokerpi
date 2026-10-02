@@ -1,19 +1,48 @@
 import json
 import math
 import re
-
-# Settings the API lets a client change. Everything else in the config (pins, intervals)
-# is read-only over the API: it needs a restart to take effect, so edit config.json.
-EDITABLE_FIELDS = ('set_temperature', 'damper_minimum', 'damper_maximum')
-
-# PID gains are also editable, but optional in a POST so a client that only knows the three
-# settings above keeps working. Sanity limits, not tuning advice.
-PID_FIELDS = {'pid_kp': 100, 'pid_ki': 10, 'pid_kd': 100}
+from collections import namedtuple
 
 # Limits, from the hardware code: the damper maps 0-100 onto a servo pulse width between
 # damper_minimum and damper_maximum, which pigpio only accepts between 500 and 2500
 # microseconds.
 SERVO_MIN, SERVO_MAX = 500, 2500
+
+
+class Field(namedtuple('Field', 'name default kind low high')):
+    """One setting in config.json: its default, and how a POST /api/config may change it.
+
+    kind is 'whole' (a required whole number between low and high, high None for no upper
+    limit), 'gain' (an optional number from 0 to high, so a client that only knows the
+    'whole' settings keeps working), 'bool' (optional), or None for settings the API does
+    not accept because they need a restart (pins, intervals): edit config.json for those."""
+    __slots__ = ()
+
+    def __new__(cls, name, default, kind=None, low=None, high=None):
+        return super().__new__(cls, name, default, kind, low, high)
+
+
+FIELDS = (
+    Field('cs_pin', 20),
+    Field('clock_pin', 21),
+    Field('data_pin', 16),
+    Field('blower_pin1', 26),
+    Field('blower_pin2', 19),
+    Field('damper_pin', 13),
+    Field('set_temperature', 105, 'whole', 1, None),
+    Field('graph_interval', 10),
+    Field('worker_interval', 10),
+    Field('sensor_timeout', 60),
+    Field('password', ''),
+    # PID gain limits are sanity limits, not tuning advice.
+    Field('pid_kp', 1, 'gain', 0, 100),
+    Field('pid_ki', 0.1, 'gain', 0, 10),
+    Field('pid_kd', 0.05, 'gain', 0, 100),
+    Field('damper_invert', False, 'bool'),
+    Field('history_max_mb', 5),
+    Field('damper_minimum', 500, 'whole', SERVO_MIN, SERVO_MAX),
+    Field('damper_maximum', 2500, 'whole', SERVO_MIN, SERVO_MAX),
+)
 
 
 def _whole_number(value):
@@ -40,49 +69,52 @@ def _gain(value):
     return number
 
 
+def _whole_number_message(field):
+    if field.high is None:
+        return 'must be a whole number above %d' % (field.low - 1)
+    return 'must be a whole number between %d and %d' % (field.low, field.high)
+
+
 def validateEditableConfig(payload):
     """Check the editable settings in a POSTed config.
 
-    Returns (values, errors): values maps each valid field to an int, errors maps each
+    Returns (values, errors): values maps each valid field to its value, errors maps each
     invalid or missing field to a message. Numeric strings are accepted because that is
     how the web form sends them."""
-    bounds = {
-        'set_temperature': (1, None, 'must be a whole number above 0'),
-        'damper_minimum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
-        'damper_maximum': (SERVO_MIN, SERVO_MAX, 'must be a whole number between %d and %d' % (SERVO_MIN, SERVO_MAX)),
-    }
     values, errors = {}, {}
-    for field in EDITABLE_FIELDS:
-        low, high, message = bounds[field]
-        if field not in payload:
-            errors[field] = 'is required'
+    for field in FIELDS:
+        if field.kind is None:
             continue
-        try:
-            number = _whole_number(payload[field])
-        except ValueError:
-            errors[field] = message
+        name = field.name
+        if name not in payload:
+            if field.kind == 'whole':
+                errors[name] = 'is required'
             continue
-        if number < low or (high is not None and number > high):
-            errors[field] = message
-        else:
-            values[field] = number
-    for field, high in PID_FIELDS.items():
-        if field not in payload:
-            continue
-        try:
-            number = _gain(payload[field])
-        except ValueError:
-            number = None
-        if number is None or number < 0 or number > high:
-            errors[field] = 'must be a number between 0 and %g' % high
-        else:
-            values[field] = number
-    if 'damper_invert' in payload:
-        if isinstance(payload['damper_invert'], bool):
-            values['damper_invert'] = payload['damper_invert']
-        else:
-            errors['damper_invert'] = 'must be true or false'
-    if 'damper_minimum' in values and 'damper_maximum' in values             and values['damper_minimum'] >= values['damper_maximum']:
+        value = payload[name]
+        if field.kind == 'whole':
+            try:
+                number = _whole_number(value)
+            except ValueError:
+                number = None
+            if number is None or number < field.low or (field.high is not None and number > field.high):
+                errors[name] = _whole_number_message(field)
+            else:
+                values[name] = number
+        elif field.kind == 'gain':
+            try:
+                number = _gain(value)
+            except ValueError:
+                number = None
+            if number is None or number < field.low or number > field.high:
+                errors[name] = 'must be a number between %g and %g' % (field.low, field.high)
+            else:
+                values[name] = number
+        elif field.kind == 'bool':
+            if isinstance(value, bool):
+                values[name] = value
+            else:
+                errors[name] = 'must be true or false'
+    if 'damper_minimum' in values and 'damper_maximum' in values and values['damper_minimum'] >= values['damper_maximum']:
         errors['damper_minimum'] = 'must be less than damper_maximum'
         del values['damper_minimum']
     return values, errors
@@ -132,4 +164,4 @@ class Config:
             json.dump(data, configfile)
 
     def defaultConfig(self):
-        return  { 'cs_pin': 20, 'clock_pin': 21, 'data_pin': 16, 'blower_pin1': 26, 'blower_pin2': 19, 'damper_pin': 13, 'set_temperature': 105, 'graph_interval': 10, 'worker_interval': 10, 'sensor_timeout': 60, 'password': '', 'pid_kp': 1, 'pid_ki': 0.1, 'pid_kd': 0.05, 'damper_invert': False, 'history_max_mb': 5, 'damper_minimum': 500, 'damper_maximum': 2500 }        
+        return {field.name: field.default for field in FIELDS}
