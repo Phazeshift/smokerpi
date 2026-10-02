@@ -12,6 +12,7 @@ class Worker:
 
     def __init__(self, app):
         self.app = app
+        self.reportedStall = None
 
     def monitorTemp(self):
         # The thermocouple sometimes fails to answer one check and answers the next, so a
@@ -70,26 +71,55 @@ class Worker:
         """One pass of the control loop. It never raises.
 
         An exception here used to kill the worker thread silently, which froze the
-        temperature reading and the PID and left the blower in whatever state it was in."""
+        temperature reading and the PID and left the blower in whatever state it was in.
+
+        The hardware is only touched under app.smokerpi_lock, which the control routes take
+        too: otherwise a button press could land between this pass deciding the PID is
+        running and moving the hardware, and be undone by it. The temperature read (slow,
+        bit-banged) stays outside the lock."""
         app = self.app
         sensorOk = self.runStep('temperature read', self.monitorTemp)
-        # Do not act on a reading that could not be taken.
-        controlOk = self.runStep('PID update', self.updatePid) if sensorOk else False
-        self.runStep('graph update', self.graphData)
-        if not (sensorOk and controlOk):
-            self.failSafe()
+        with app.smokerpi_lock:
+            if not app.smokerpi_running:
+                return          # cleanupHardware() has released the hardware
+            # Do not act on a reading that could not be taken.
+            controlOk = self.runStep('PID update', self.updatePid) if sensorOk else False
+            self.runStep('graph update', self.graphData)
+            if not (sensorOk and controlOk):
+                self.failSafe()
         app.smokerpi_lastPass = app.smokerpi_clock()
+
+    def stalledFor(self):
+        """Seconds since the last completed pass if that is past the stall limit, else None."""
+        app = self.app
+        silent = app.smokerpi_clock() - app.smokerpi_lastPass
+        return silent if silent > max(30, 3 * app.smokerpi_workerInterval) else None
 
     def error(self):
         """Why the control loop is not working, or None. Shown to the user, who would
         otherwise only see a frozen temperature."""
         app = self.app
-        silent = app.smokerpi_clock() - app.smokerpi_lastPass
-        if silent > max(30, 3 * app.smokerpi_workerInterval):
+        silent = self.stalledFor()
+        if silent is not None:
             return 'Control loop has stopped (no pass for %d seconds)' % silent
         if app.smokerpi_stepErrors:
             return '; '.join('%s: %s' % item for item in app.smokerpi_stepErrors.items())
         return None
+
+    def checkWatchdog(self):
+        """Switch the blower off if the loop has stalled, e.g. stuck in a hardware call where
+        its own fail-safe can never run. A stuck loop usually holds the lock, so this does
+        not take it: Blower.off() only writes two GPIO pins. Logged once per stall."""
+        app = self.app
+        silent = self.stalledFor()
+        if silent is None:
+            return
+        # Remember which pass the loop stalled after, so a recovery and a new stall between
+        # two checks is still reported.
+        if self.reportedStall != app.smokerpi_lastPass:
+            app.logger.error('Control loop has stopped (no pass for %d seconds); switching the blower off', silent)
+            self.reportedStall = app.smokerpi_lastPass
+        self.failSafe()
 
     def run(self):
         app = self.app
@@ -98,8 +128,23 @@ class Worker:
             time.sleep(app.smokerpi_workerInterval)
         print("Worker complete")
 
+    def watch(self):
+        app = self.app
+        while app.smokerpi_running:
+            time.sleep(min(5, app.smokerpi_workerInterval))
+            try:
+                self.checkWatchdog()
+            except Exception:
+                app.logger.exception('Watchdog check failed')
+
     def start(self):
         thread = threading.Thread(target=self.run)
+        thread.daemon = True
+        thread.start()
+        return thread
+
+    def startWatchdog(self):
+        thread = threading.Thread(target=self.watch)
         thread.daemon = True
         thread.start()
         return thread
