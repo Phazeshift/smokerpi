@@ -2,7 +2,7 @@ from flask import Flask
 import logging
 from logging.handlers import RotatingFileHandler
 from .hardware.blower import Blower
-from .hardware.damper2 import Damper, TestDamper
+from .hardware.damper2 import Damper, emulatedDamper
 from .hardware.pitcontroller import PitController
 from .hardware.max31855 import MAX31855, TestMAX31855
 from .config import Config, applyConfig
@@ -78,10 +78,8 @@ def create_app(test_config=None):
 
     def configure():
         config = app.smokerpi_config
-        if (app.smokerpi_test):
-            app.smokerpi_damper = TestDamper()
-        else:
-            app.smokerpi_damper = Damper(config['damper_pin'], config['damper_minimum'], config['damper_maximum'], bool(config.get('damper_invert', False)))
+        makeDamper = emulatedDamper if app.smokerpi_test else Damper
+        app.smokerpi_damper = makeDamper(config['damper_pin'], config['damper_minimum'], config['damper_maximum'], bool(config.get('damper_invert', False)))
         app.smokerpi_blower = Blower(config['blower_pin1'], config['blower_pin2'])
         applyConfig(app)
         app.smokerpi_pitController = PitController(app.smokerpi_blower, app.smokerpi_damper)
