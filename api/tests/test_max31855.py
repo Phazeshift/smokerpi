@@ -175,6 +175,25 @@ class TestGlitchedReads:
         reader = scripted_reader(bad, bad, word(26.75), word(26.75))
         assert reader.get() == 26.75
 
+    def test_an_all_zero_word_is_not_trusted(self):
+        # Seen on the Pi (2026-10-02): half an hour of exactly 0.0 with no fault. A sensor that
+        # is not driving the data line at all reads as 32 zero bits, which have no fault bit set,
+        # and two of them agree. A real reading always has the chip's own junction temperature
+        # in D15-D4.
+        reader = scripted_reader(0, 0, word(26.75), word(26.75))
+        assert reader.get() == 26.75
+
+    def test_only_all_zero_words_is_a_no_data_error_not_a_reading_of_zero(self):
+        reader = scripted_reader(*[0] * 6)
+        with pytest.raises(MAX31855Error) as excinfo:
+            reader.get()
+        assert 'No data' in excinfo.value.value
+        assert reader.reads == 6
+
+    def test_a_real_zero_degree_reading_is_still_accepted(self):
+        reader = scripted_reader(word(0.0), word(0.0))
+        assert reader.get() == 0.0
+
     def test_a_fault_still_raises_immediately(self):
         reader = scripted_reader(word(26.75) | 0x10000 | 1)
         with pytest.raises(MAX31855Error) as excinfo:
@@ -198,7 +217,11 @@ class TestTheRealReaderUnderGpioRules:
 
     def test_a_read_clocks_the_bus_and_deselects_the_chip_again(self):
         sensor = MAX31855(20, 21, 16)
-        assert sensor.get() == 0.0          # the shim's data line reads low: 32 zero bits
+        # The shim's data line reads low, like a sensor that is not driving it: 32 zero bits,
+        # which is no data, not 0 degrees.
+        with pytest.raises(MAX31855Error, match='No data'):
+            sensor.get()
+        assert sensor.data == 0
         assert GPIO.input(20) == GPIO.HIGH
         assert GPIO.input(21) == GPIO.HIGH
 
