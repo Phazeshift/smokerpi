@@ -265,3 +265,36 @@ class TestDamperInvert:
             assert app.smokerpi_damper.invert is True
         finally:
             app.smokerpi_running = False
+
+
+class TestFieldDescriptions:
+    """GET /api/config also says which settings the Config page should show, and how."""
+
+    def fields(self, client):
+        return {f['name']: f for f in current_config(client)['fields']}
+
+    def test_describes_each_editable_and_read_only_setting(self, client):
+        fields = self.fields(client)
+        assert fields['set_temperature'] == {
+            'name': 'set_temperature', 'label': 'Target temperature', 'kind': 'whole', 'help': None}
+        assert fields['pid_kp']['kind'] == 'gain'
+        assert fields['damper_invert']['kind'] == 'bool'
+        assert 'smaller pulse width' in fields['damper_invert']['help']
+        assert fields['cs_pin']['kind'] is None
+
+    def test_leaves_out_settings_that_are_not_for_display(self, client):
+        fields = self.fields(client)
+        for name in ('password', 'worker_interval', 'sensor_timeout', 'history_max_mb'):
+            assert name not in fields
+
+    def test_only_describes_settings_the_config_has(self, app, client):
+        del app.smokerpi_config['pid_kp']
+        assert 'pid_kp' not in self.fields(client)
+
+    def test_a_leftover_setting_with_no_field_is_not_described(self, app, client):
+        app.smokerpi_config['blower_minimum'] = 40
+        assert 'blower_minimum' not in self.fields(client)
+
+    def test_the_post_response_has_them_too(self, client):
+        response = client.post('/api/config', json=valid_payload())
+        assert 'fields' in json.loads(response.data)

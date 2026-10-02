@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 HEADER = 'point,time,temperature,blower,damper,target'
 FILE_TIME = '%Y-%m-%d %H:%M:%S'      # what the CSV holds: sortable and understood by spreadsheets
 GRAPH_TIME = '%d/%m/%Y %H:%M:%S'     # what the graph points have always used
+GRAPH_POINTS = 2000   # how many points the graph keeps in memory, and restores after a restart
 
 
 def _number(text):
