@@ -113,3 +113,8 @@ class TestGraphEndpoint:
         response = client.get('/api/graph?from=1')
         data = json.loads(response.data)
         assert [entry['i'] for entry in data] == [1, 2]
+
+    def test_a_non_numeric_from_is_a_400_not_a_500(self, client):
+        response = client.get('/api/graph?from=abc')
+        assert response.status_code == 400
+        assert 'from' in json.loads(response.data)['error']

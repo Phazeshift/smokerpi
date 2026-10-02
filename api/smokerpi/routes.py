@@ -39,12 +39,11 @@ def registerRoutes(app, worker):
 
     @app.route('/api/graph')
     def graph():
-        fromIndex = int(request.args.get("from", "0"))
-        graphData = []
-        for val in app.smokerpi_graphData:
-            if (val['i'] >= fromIndex):
-                graphData.append(val)
-        return json.dumps(graphData)
+        try:
+            fromIndex = int(request.args.get("from", "0"))
+        except ValueError:
+            return jsonify(error='"from" must be a whole number'), 400
+        return json.dumps([point for point in app.smokerpi_graphData if point['i'] >= fromIndex])
 
     @app.route('/api/history.csv')
     def history():
@@ -79,45 +78,46 @@ def registerRoutes(app, worker):
                     return jsonify(error='Saved, but the damper could not be moved to match: %s' % e), 500
         return json.dumps(publicConfig())
 
-    @app.route('/api/blower', methods = ['POST'])
-    def blower():
+    def control(action):
+        """Run a control request: validate `enabled`, then call action(enabled). Every manual
+        control takes the PID out of the loop."""
         enabled = enabledFlag()
         if enabled is None:
             return badEnabled()
+        action(enabled)
+        return json.dumps(publicConfig())
+
+    def stopPid():
         app.smokerpi_pidRunning = False
         app.smokerpi_pid.auto_mode = False
-        if (enabled):
-          app.smokerpi_blower.on()
-        else:
-          app.smokerpi_blower.off()
-        return json.dumps(publicConfig())
+
+    @app.route('/api/blower', methods = ['POST'])
+    def blower():
+        def act(enabled):
+            stopPid()
+            if enabled:
+                app.smokerpi_blower.on()
+            else:
+                app.smokerpi_blower.off()
+        return control(act)
 
     @app.route('/api/damper', methods = ['POST'])
     def damper():
-        enabled = enabledFlag()
-        if enabled is None:
-            return badEnabled()
-        app.smokerpi_pidRunning = False
-        app.smokerpi_pid.auto_mode = False
-        if (enabled):
-          app.smokerpi_damper.open(100)
-        else:
-          app.smokerpi_damper.open(0)
-        return json.dumps(publicConfig())
+        def act(enabled):
+            stopPid()
+            app.smokerpi_damper.open(100 if enabled else 0)
+        return control(act)
 
     @app.route('/api/pid', methods = ['POST'])
     def pid():
-        enabled = enabledFlag()
-        if enabled is None:
-            return badEnabled()
-        if (enabled):
-            app.smokerpi_pidRunning = True
-            app.smokerpi_pid.auto_mode = True
-        else:
-            app.smokerpi_pidRunning = False
-            app.smokerpi_pid.auto_mode = False
-            app.smokerpi_blower.off()
-        return json.dumps(publicConfig())
+        def act(enabled):
+            if enabled:
+                app.smokerpi_pidRunning = True
+                app.smokerpi_pid.auto_mode = True
+            else:
+                stopPid()
+                app.smokerpi_blower.off()
+        return control(act)
 
     @app.errorhandler(InternalServerError)
     def handle_500(e):
