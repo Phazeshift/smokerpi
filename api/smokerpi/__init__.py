@@ -12,6 +12,7 @@ from .auth import registerAuth
 from .routes import registerRoutes
 from .worker import Worker
 import platform
+import threading
 import time
 import os
 
@@ -63,6 +64,12 @@ def create_app(test_config=None):
     app.smokerpi_graphData = []
     app.smokerpi_graphIndex = 0
     app.smokerpi_running = True
+    # Held while the hardware or the control mode changes: by each worker pass and by the
+    # control and config routes, which run on their own threads. A route waits at most
+    # smokerpi_lockTimeout seconds for it (a pass holds it for about a second when the damper
+    # moves) and then answers 503 rather than hang behind a stuck loop.
+    app.smokerpi_lock = threading.Lock()
+    app.smokerpi_lockTimeout = 5
     app.smokerpi_clock = time.monotonic
     app.smokerpi_lastReading = app.smokerpi_clock()
     app.smokerpi_lastPass = app.smokerpi_clock()
@@ -98,19 +105,28 @@ def create_app(test_config=None):
         app.smokerpi_graphIndex = app.smokerpi_graphData[-1]['i'] + 1 if app.smokerpi_graphData else 0
         if test_config is None or test_config.get('start_worker', True):
             app.worker = worker.start()
+            app.watchdog = worker.startWatchdog()
 
     def cleanupHardware():
         print("Cleanup")
         app.logger.info('Cleaning up')
-        app.smokerpi_running = False
-        app.smokerpi_blower.cleanup()
-        app.smokerpi_max31855.cleanup()
-        app.smokerpi_damper.cleanup()
+        # Wait for a step in progress so it cannot move the hardware after it is released, but
+        # not for ever: a stuck loop must not stop the hardware being cleaned up.
+        locked = app.smokerpi_lock.acquire(timeout=app.smokerpi_lockTimeout)
+        try:
+            app.smokerpi_running = False
+            app.smokerpi_blower.cleanup()
+            app.smokerpi_max31855.cleanup()
+            app.smokerpi_damper.cleanup()
+        finally:
+            if locked:
+                app.smokerpi_lock.release()
 
     app.cleanupHardware = cleanupHardware
 
     worker = Worker(app)
     app.smokerpi_workerStep = worker.step
+    app.smokerpi_watchdogCheck = worker.checkWatchdog
     registerAuth(app)
     registerRoutes(app, worker)
 

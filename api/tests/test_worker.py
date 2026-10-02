@@ -5,6 +5,7 @@ running blower stayed running unsupervised. These tests cover the loop surviving
 failing safe (blower off) when a hardware or sensor step fails."""
 import json
 import logging
+import threading
 import time
 
 import pytest
@@ -54,6 +55,7 @@ class Clock:
         self.now = 1000.0
         app.smokerpi_clock = lambda: self.now
         app.smokerpi_lastReading = self.now
+        app.smokerpi_lastPass = self.now
 
     def advance(self, seconds):
         self.now += seconds
@@ -312,7 +314,99 @@ class TestWorkerHealth:
         assert self.workerError(app) is None
 
 
+class TestWatchdog:
+    """A worker stuck in a hardware call never reaches its own fail-safe, so a separate
+    watchdog switches the blower off once no pass has completed for the stall limit."""
+
+    def test_a_stalled_loop_switches_the_blower_off(self, app, caplog):
+        clock = Clock(app)
+        app.smokerpi_workerStep()
+        app.smokerpi_blower.on()
+        clock.advance(120)
+
+        app.smokerpi_watchdogCheck()
+
+        assert app.smokerpi_blower.state == 0
+        assert any('stopped' in r.getMessage() for r in errors(caplog))
+
+    def test_a_running_loop_is_left_alone(self, app, caplog):
+        clock = Clock(app)
+        app.smokerpi_workerStep()
+        app.smokerpi_blower.on()
+        clock.advance(10)
+
+        app.smokerpi_watchdogCheck()
+
+        assert app.smokerpi_blower.state == 100
+        assert errors(caplog) == []
+
+    def test_it_does_not_wait_for_the_control_lock(self, app):
+        # A stuck worker is usually stuck holding the lock.
+        clock = Clock(app)
+        app.smokerpi_blower.on()
+        clock.advance(120)
+        app.smokerpi_lock.acquire()
+        try:
+            check = threading.Thread(target=app.smokerpi_watchdogCheck)
+            check.start()
+            check.join(2)
+            assert not check.is_alive(), 'the watchdog waited for the lock'
+        finally:
+            app.smokerpi_lock.release()
+        assert app.smokerpi_blower.state == 0
+
+    def test_it_logs_once_per_stall(self, app, caplog):
+        clock = Clock(app)
+        clock.advance(120)
+        app.smokerpi_watchdogCheck()
+        app.smokerpi_watchdogCheck()
+        assert len(errors(caplog)) == 1
+
+        app.smokerpi_workerStep()          # the loop recovers
+        clock.advance(120)                 # and stalls again
+        app.smokerpi_watchdogCheck()
+        assert len(errors(caplog)) == 2
+
+    def test_a_failing_blower_is_survived_and_logged(self, app, caplog):
+        clock = Clock(app)
+        app.smokerpi_blower = Exploding('relay boom')
+        clock.advance(120)
+        app.smokerpi_watchdogCheck()       # must not raise
+        assert 'relay boom' in caplog.text
+
+
 class TestTheThread:
+    def test_the_watchdog_thread_stops_the_blower_when_the_worker_hangs(self):
+        config = dict(Config(test=True).defaultConfig(), worker_interval=0.02, graph_interval=0.02)
+        application = create_app(test_config={'config': config, 'start_worker': True})
+        stuck = threading.Event()
+        release = threading.Event()
+
+        class Hanging:
+            def set(self, value):
+                stuck.set()
+                release.wait(10)
+
+        try:
+            application.smokerpi_pitController = Hanging()
+            application.smokerpi_pidRunning = True
+            assert stuck.wait(5), 'the worker never reached the hardware'
+            application.smokerpi_blower.on()
+            # Jump past the stall limit rather than wait 30 seconds.
+            application.smokerpi_clock = lambda: time.monotonic() + 1000
+
+            deadline = time.time() + 5
+            while application.smokerpi_blower.state != 0 and time.time() < deadline:
+                time.sleep(0.02)
+
+            assert application.smokerpi_blower.state == 0
+            assert application.watchdog.is_alive()
+        finally:
+            application.smokerpi_running = False
+            release.set()
+            application.worker.join(2)
+            application.watchdog.join(2)
+
     def test_the_worker_thread_survives_repeated_failures(self):
         config = dict(Config(test=True).defaultConfig(), worker_interval=0.02, graph_interval=0.02)
         application = create_app(test_config={'config': config, 'start_worker': True})

@@ -20,6 +20,18 @@ def registerRoutes(app, worker):
     def badEnabled():
         return jsonify(error='Expected a JSON object with a true or false "enabled"'), 400
 
+    def locked(action):
+        """Run action() holding the control lock, so a worker pass cannot interleave with it
+        and undo it. A 503 if the lock is not free in time (the loop is stuck in a hardware
+        call), rather than leave the request hanging."""
+        if not app.smokerpi_lock.acquire(timeout=app.smokerpi_lockTimeout):
+            app.logger.error('Control request %s gave up waiting for the control loop', request.path)
+            return jsonify(error='The control loop is busy or stuck; nothing was changed. Try again.'), 503
+        try:
+            return action()
+        finally:
+            app.smokerpi_lock.release()
+
     @app.route('/')
     def index():
         return app.send_static_file('index.html')
@@ -43,7 +55,10 @@ def registerRoutes(app, worker):
             fromIndex = int(request.args.get("from", "0"))
         except ValueError:
             return jsonify(error='"from" must be a whole number'), 400
-        return json.dumps([point for point in app.smokerpi_graphData if point['i'] >= fromIndex])
+        # Copy first: the worker appends to the list and trims its front while this runs, and
+        # walking a list that shifts underneath skips points. list() copies it in one step.
+        points = list(app.smokerpi_graphData)
+        return json.dumps([point for point in points if point['i'] >= fromIndex])
 
     @app.route('/api/history.csv')
     def history():
@@ -65,17 +80,24 @@ def registerRoutes(app, worker):
             if errors:
                 message = 'Invalid configuration: ' + '; '.join('%s %s' % (k, v) for k, v in errors.items())
                 return jsonify(error=message, errors=errors), 400
-            app.smokerpi_config.update(values)
-            invertChanged = applyConfig(app)
-            Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
-            if invertChanged:
-                # Move the damper to the mirrored position now; the PID would not re-send an
-                # unchanged position. The setting is kept either way.
-                try:
-                    app.smokerpi_damper.reposition()
-                except Exception as e:
-                    app.logger.exception('Could not move the damper after changing damper_invert')
-                    return jsonify(error='Saved, but the damper could not be moved to match: %s' % e), 500
+
+            def save():
+                app.smokerpi_config.update(values)
+                invertChanged = applyConfig(app)
+                Config(app.smokerpi_test).saveConfig(app.smokerpi_config)
+                if invertChanged:
+                    # Move the damper to the mirrored position now; the PID would not re-send an
+                    # unchanged position. The setting is kept either way.
+                    try:
+                        app.smokerpi_damper.reposition()
+                    except Exception as e:
+                        app.logger.exception('Could not move the damper after changing damper_invert')
+                        return jsonify(error='Saved, but the damper could not be moved to match: %s' % e), 500
+                return None
+
+            failed = locked(save)
+            if failed is not None:
+                return failed
         return json.dumps(dict(publicConfig(), fields=describeFields(app.smokerpi_config)))
 
     def control(action):
@@ -84,8 +106,11 @@ def registerRoutes(app, worker):
         enabled = enabledFlag()
         if enabled is None:
             return badEnabled()
-        action(enabled)
-        return json.dumps(publicConfig())
+
+        def act():
+            action(enabled)
+            return json.dumps(publicConfig())
+        return locked(act)
 
     def stopPid():
         app.smokerpi_pidRunning = False
