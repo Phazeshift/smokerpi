@@ -11,32 +11,27 @@ export const getGraphData = () => (dispatch, getState) => {
     return api(dispatch, `/api/graph?from=${from}`, LOAD_GRAPH_DATA_SUCCESS)
 }
 
-export const getConfig = () => (dispatch) => {    
+export const getConfig = () => (dispatch) => {
     return api(dispatch, `/api/config`, LOAD_CONFIG_DATA_SUCCESS);
-    }
+}
 
-export const updateConfig = (config) => (dispatch) => {    
+export const updateConfig = (config) => (dispatch) => {
     return postApi(dispatch, `/api/config`, config, () => dispatch(getConfig()));
-    }    
+}
 
-export const getCurrentState = () => (dispatch) => {    
+export const getCurrentState = () => (dispatch) => {
     return api(dispatch, `/api/state`, LOAD_STATE_DATA_SUCCESS);
-    }
+}
 
-export const toggleBlower = () => (dispatch, getState) => {    
-    let enabled = getState().smokerpi.state.blower;
-    return postApi(dispatch, `/api/blower`, { enabled: enabled !== 100 }, () => dispatch(getCurrentState()));
-    }
+// A manual control posts the opposite of what it is now, then refreshes the state.
+const toggle = (url, isOn) => () => (dispatch, getState) => {
+    const enabled = !isOn(getState().smokerpi.state);
+    return postApi(dispatch, url, { enabled }, () => dispatch(getCurrentState()));
+}
 
-export const toggleDamper = () => (dispatch, getState) => {    
-    let enabled = getState().smokerpi.state.damper;
-    return postApi(dispatch, `/api/damper`, { enabled: enabled !== 100 }, () => dispatch(getCurrentState()));
-    }
-
-export const toggleAutomatic = () => (dispatch, getState) => {    
-    let enabled = getState().smokerpi.state.pid;
-    return postApi(dispatch, `/api/pid`, { enabled: !enabled }, () => dispatch(getCurrentState()));
-    }
+export const toggleBlower = toggle(`/api/blower`, state => state.blower === 100);
+export const toggleDamper = toggle(`/api/damper`, state => state.damper === 100);
+export const toggleAutomatic = toggle(`/api/pid`, state => state.pid);
 
 // Prefer the message the server sent ({"error": "..."}) over the bare HTTP status text.
 const responseError = async response => {
@@ -54,8 +49,10 @@ const responseError = async response => {
 
 const apiError = error => ({ type: API_ERROR, message: `Error calling api: ${error.message}` });
 
-const api = (dispatch, url, action) => {       
-    return fetch(url)
+// Fetch, turn an error response into an Error, and hand the parsed JSON to onSuccess.
+// A failure of any kind becomes an API_ERROR action.
+const request = (dispatch, url, options, onSuccess) => {
+    return (options ? fetch(url, options) : fetch(url))
         .then(async response => {
             if (response.ok) {
                 return response.json();
@@ -64,31 +61,21 @@ const api = (dispatch, url, action) => {
         })
         .then(
             data => {
-                dispatch({type: action, data});
+                onSuccess(data);
             },
             error => {
                 dispatch(apiError(error));
             })
-    }
+}
 
-const postApi = (dispatch, url, postData, then) => {       
-    return fetch(url, {
+const api = (dispatch, url, action) => {
+    return request(dispatch, url, undefined, data => dispatch({type: action, data}));
+}
+
+const postApi = (dispatch, url, postData, then) => {
+    return request(dispatch, url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(postData) 
-        })
-        .then(async response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw await responseError(response);
-        })
-        .then(
-            data => {
-                then(dispatch, data);
-            },
-            error => {
-                dispatch(apiError(error));
-            })
-    }    
-   
+        body: JSON.stringify(postData)
+    }, data => then(dispatch, data));
+}
