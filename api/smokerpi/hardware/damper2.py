@@ -1,11 +1,18 @@
+import time
+
 try:
     import pigpio
-    import time
 except (RuntimeError, ModuleNotFoundError):
-    pass
+    pigpio = None
+
+from . import fakepigpio
 
 class Damper:    
-    def __init__(self, pin = 13, min = 500, max = 2500, invert = False):
+    def __init__(self, pin = 13, min = 500, max = 2500, invert = False, pigpioModule = None, settle = 1):
+        # pigpioModule replaces the real pigpio (see emulatedDamper); settle is how long a
+        # move pulses the servo before stopping, in seconds.
+        self.pigpioModule = pigpioModule
+        self.settle = settle
         self.min = min
         self.max = max
         # Some linkages open the damper at the smaller pulse width. Position 100 always means
@@ -22,7 +29,7 @@ class Damper:
         # next move. pigpio.pi() does not raise when the daemon is down; it returns an
         # object with connected False.
         if self.pi is None:
-            pi = pigpio.pi()
+            pi = (self.pigpioModule or pigpio).pi()
             if not pi.connected:
                 pi.stop()
                 raise ConnectionError('Cannot connect to pigpiod')
@@ -60,37 +67,26 @@ class Damper:
         try:
             pi = self.connect()
             pi.set_servo_pulsewidth(self.pin, pos)
-            time.sleep(1)
+            time.sleep(self.settle)
             pi.set_servo_pulsewidth(self.pin, 0)
         except Exception:
             self.disconnect()
             raise
         self.state = value            
 
-class TestDamper():
-    def __init__(self):
-        self.state = -1
-        self.invert = False
-        pass
-
-    def reposition(self):
-        pass
-
-    def open(self, value):
-        self.state = value
-        pass
-
-    def cleanup(self):
-        pass
+def emulatedDamper(pin, min, max, invert = False):
+    """The real Damper against the fake pigpio, without waiting for a servo to settle: what
+    the app uses off the Pi, so the pulse mapping, invert and reconnect logic run there too."""
+    return Damper(pin, min, max, invert, pigpioModule=fakepigpio, settle=0)
 
 if __name__ == "__main__":        
     damper = Damper()
     try:
         while(True):        
             damper.open(0)
-            time.sleep(1)
+            time.sleep(self.settle)
             damper.open(100)
-            time.sleep(1)
+            time.sleep(self.settle)
     except KeyboardInterrupt:
         pass        
     damper.cleanup()

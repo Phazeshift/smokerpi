@@ -1,10 +1,10 @@
 from smokerpi.hardware.blower import Blower
-from smokerpi.hardware.damper2 import TestDamper
+from smokerpi.hardware.damper2 import emulatedDamper
 from smokerpi.hardware.pitcontroller import PitController
 
 
 def make_controller():
-    return PitController(Blower(26, 19), TestDamper())
+    return PitController(Blower(26, 19), emulatedDamper(13, 500, 2500))
 
 
 class TestPitController:

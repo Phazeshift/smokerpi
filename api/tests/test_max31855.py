@@ -1,5 +1,6 @@
 import pytest
 
+from smokerpi.hardware.RPi import GPIO
 from smokerpi.hardware.max31855 import MAX31855, MAX31855Error, TestMAX31855
 
 
@@ -184,3 +185,24 @@ class TestGlitchedReads:
     def test_the_agreed_value_is_converted_to_the_requested_units(self):
         reader = scripted_reader(word(100.0), word(100.0), units='f')
         assert reader.get() == 212.0
+
+
+class TestTheRealReaderUnderGpioRules:
+    """The bit-banged read runs against the off-Pi GPIO shim, which enforces the real library's
+    rules, so a pin used before it is set up (or in the wrong direction) fails here."""
+
+    def test_sets_up_its_pins_with_the_chip_deselected(self):
+        MAX31855(20, 21, 16)
+        assert [GPIO.gpio_function(pin) for pin in (20, 21, 16)] == [GPIO.OUT, GPIO.OUT, GPIO.IN]
+        assert GPIO.input(20) == GPIO.HIGH
+
+    def test_a_read_clocks_the_bus_and_deselects_the_chip_again(self):
+        sensor = MAX31855(20, 21, 16)
+        assert sensor.get() == 0.0          # the shim's data line reads low: 32 zero bits
+        assert GPIO.input(20) == GPIO.HIGH
+        assert GPIO.input(21) == GPIO.HIGH
+
+    def test_cleanup_releases_the_output_pins(self):
+        sensor = MAX31855(20, 21, 16)
+        sensor.cleanup()
+        assert [GPIO.gpio_function(pin) for pin in (20, 21)] == [GPIO.IN, GPIO.IN]

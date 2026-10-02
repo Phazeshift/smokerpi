@@ -1,24 +1,75 @@
+import time
 import types
 
 import pytest
 
-from smokerpi.hardware import damper2
-from smokerpi.hardware.damper2 import Damper, TestDamper
+from smokerpi.hardware import damper2, fakepigpio
+from smokerpi.hardware.damper2 import Damper, emulatedDamper
 
 
-class TestDamperEmulator:
-    def test_starts_closed(self):
-        damper = TestDamper()
-        assert damper.state == -1
+class TestFakePigpio:
+    """What the emulated damper talks to instead of pigpiod. It rejects what pigpio rejects."""
 
-    def test_open_sets_state(self):
-        damper = TestDamper()
-        damper.open(75)
-        assert damper.state == 75
+    def test_records_the_pulses_sent(self):
+        pi = fakepigpio.pi()
+        pi.set_servo_pulsewidth(13, 1500)
+        assert pi.pulses == [(13, 1500)]
 
-    def test_cleanup_does_not_raise(self):
-        damper = TestDamper()
-        damper.cleanup()
+    @pytest.mark.parametrize('width', [0, 500, 1500, 2500])
+    def test_accepts_off_and_the_servo_range(self, width):
+        fakepigpio.pi().set_servo_pulsewidth(13, width)
+
+    @pytest.mark.parametrize('width', [100, 499, 2501])
+    def test_a_pulse_width_outside_the_servo_range_is_an_error(self, width):
+        with pytest.raises(fakepigpio.error, match='pulsewidth not 0 or 500-2500'):
+            fakepigpio.pi().set_servo_pulsewidth(13, width)
+
+    def test_a_pin_that_is_not_a_user_gpio_is_an_error(self):
+        with pytest.raises(fakepigpio.error, match='GPIO not 0-31'):
+            fakepigpio.pi().set_servo_pulsewidth(32, 1500)
+
+    def test_is_connected_until_stopped(self):
+        pi = fakepigpio.pi()
+        assert pi.connected
+        pi.stop()
+        assert not pi.connected
+
+
+class TestEmulatedDamper:
+    """Off the Pi the app runs the real Damper against the fake pigpio, so the pulse mapping,
+    invert and reconnect logic run in the emulator too (there used to be a separate
+    TestDamper that only stored the position)."""
+
+    def test_is_the_real_damper(self):
+        assert type(emulatedDamper(13, 500, 2500)) is Damper
+
+    def test_does_not_wait_for_the_servo_to_settle(self):
+        damper = emulatedDamper(13, 500, 2500)
+        started = time.monotonic()
+        for position in (10, 20, 30):
+            damper.open(position)
+        assert time.monotonic() - started < 0.5
+
+    def test_sends_the_mapped_and_mirrored_pulse(self):
+        damper = emulatedDamper(13, 600, 2400, invert=True)
+        damper.open(0)
+        assert damper.pi.pulses[-2:] == [(13, 2400), (13, 0)]
+
+    def test_a_pulse_range_pigpio_would_reject_fails_as_on_the_pi(self):
+        damper = emulatedDamper(13, 100, 2500)
+        with pytest.raises(fakepigpio.error):
+            damper.open(0)
+
+    def test_the_app_uses_it(self, app):
+        assert type(app.smokerpi_damper) is Damper
+
+    def test_changing_invert_in_the_app_really_moves_it(self, app, client):
+        app.smokerpi_damper.open(20)
+        response = client.post('/api/config', json={
+            'set_temperature': 105, 'damper_minimum': 500, 'damper_maximum': 2500, 'damper_invert': True})
+        assert response.status_code == 200
+        assert app.smokerpi_damper.pi.pulses[-2] == (13, 500 + (2000 / 100) * 80)
+        assert app.smokerpi_damper.state == 20
 
 
 class FakePi:
@@ -223,10 +274,3 @@ class TestInvert:
 
         assert damper.state == 20
         assert daemon.connections[-1].pulses[0][1] == 500 + (2000 / 100) * 80
-
-    def test_the_emulator_accepts_invert_and_reposition(self):
-        damper = TestDamper()
-        damper.invert = True
-        damper.open(40)
-        damper.reposition()
-        assert damper.state == 40

@@ -12,6 +12,7 @@ import pytest
 
 from smokerpi import create_app
 from smokerpi.config import Config
+from smokerpi.hardware.RPi import GPIO
 
 
 def default_config():
@@ -24,6 +25,13 @@ def isolated_cwd(tmp_path, monkeypatch):
     endpoint saves ./config.json, which would otherwise land in the real api/ directory and
     overwrite a developer's local config."""
     monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture(autouse=True)
+def fresh_gpio():
+    """The off-Pi GPIO shim keeps process-wide state, like the real library: which mode is set,
+    which pins are outputs. Start every test from nothing set up, as on a freshly booted Pi."""
+    GPIO.cleanup()
 
 
 @pytest.fixture
