@@ -3,7 +3,6 @@ import {
   LOAD_GRAPH_DATA_SUCCESS,
   LOAD_CONFIG_DATA_SUCCESS,
   LOAD_STATE_DATA_SUCCESS,
-  SOCKET_MESSAGE_RECEIVED,
   API_ERROR,
   API_ERROR_DISMISSED,
 } from '../actions/actions';
@@ -48,15 +47,7 @@ describe('reducer', () => {
     expect(state.state).toEqual({ temperature: 105, blower: 100 });
   });
 
-  test('SOCKET_MESSAGE_RECEIVED merges the payload into the top-level state', () => {
-    const initial = { graphData: [], graphIndex: 0, state: { temperature: 90 } };
-    const state = reducer(initial, {
-      type: SOCKET_MESSAGE_RECEIVED,
-      payload: { state: { temperature: 95 } },
-    });
-    expect(state.state).toEqual({ temperature: 95 });
-    expect(state.graphData).toEqual([]);
-  });
+
   describe('API errors', () => {
     test('API_ERROR stores the message under state.error', () => {
       const state = reducer(undefined, { type: API_ERROR, message: 'Error calling api: boom' });

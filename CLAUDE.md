@@ -15,7 +15,7 @@ On the real Pi (Linux), the backend talks to actual GPIO/SPI/pigpio hardware. Ev
 
 ### Frontend (run from repo root)
 - Install: `yarn install`
-- Dev server: `yarn start` (Vite; proxies `/api` and `/socket.io` to the Flask backend on `localhost:5000`).
+- Dev server: `yarn start` (Vite; proxies `/api` to the Flask backend on `localhost:5000`).
 - Tests: `yarn test` (Vitest, watch mode; `yarn vitest run` for a single run, as CI does). Single file: `yarn vitest run src/controls.test.jsx`.
 - Build: `yarn build` — outputs to `build/` (set in `vite.config.mjs`) because Flask serves `../../build` and the release workflow packages it.
 
@@ -58,7 +58,7 @@ Test/emulated mode is selected once, in `create_app()`: `app.smokerpi_test = pla
 - Thermocouple: real `MAX31855` (bit-banged SPI reads) vs. `TestMAX31855`, which synthesizes a temperature that drifts toward the pit controller's current output (`hardware/max31855.py`).
 - Blower (`hardware/blower.py`) has no separate test class — it always talks to `RPi.GPIO`, which resolves to the real driver on a Pi or falls back to a hand-rolled no-op shim at `hardware/RPi/GPIO.py` everywhere else (that fallback is itself the emulation, not something tests set up). **The shim accepts any call**, so a hardware-protocol mistake (e.g. writing to a pin that was never `GPIO.setup(..., OUT)`, which real `RPi.GPIO` rejects with a RuntimeError) passes CI and only fails on the Pi; that is exactly how the blower button returned 500 after a one-line change to `pwmMode`. `tests/test_blower.py` therefore also runs the Blower against a `StrictGPIO` that enforces the real library's rules; do the same for any new hardware code.
 
-`hardware/damper.py` (singular) is legacy/dead code using the Adafruit CircuitPython stack — nothing imports it; `hardware/__init__.py` is empty. Don't confuse it with the actually-used `damper2.py`.
+`hardware/__init__.py` is empty. The servo driver is `damper2.py`; the `2` is left over from an older Adafruit-based `damper.py`, which has been removed.
 
 ### PID
 
@@ -86,8 +86,6 @@ Test/emulated mode is selected once, in `create_app()`: `app.smokerpi_test = pla
 There's a single combined reducer mounted under the `smokerpi` key (`rootReducer.js` → `reducers/reducer.js`), holding `{ graphData, graphIndex, config, state }` plus an optional `error`. All server access goes through thunk action creators in `actions/actions.js` (`getConfig`, `updateConfig`, `getCurrentState`, `toggleBlower`, `toggleDamper`, `toggleAutomatic`, `getGraphData`), which call the two small `api`/`postApi` helpers wrapping `fetch`. Note `postApi`'s success callback fires an unawaited follow-up dispatch (e.g. `updateConfig` posts, then dispatches `getConfig()` to refresh state) — the POST's own promise resolves before that follow-up fetch completes, which matters if you're writing a test around it (see the `flushPromises` helper in `actions.test.js`).
 
 Failed API calls dispatch `API_ERROR` (with a message); `errorbanner.jsx`, rendered once in `App`, shows it as a dismissible alert until it is dismissed (`API_ERROR_DISMISSED`) or any later `LOAD_*_SUCCESS` action arrives (the reducer drops `error` on those). There is no toast library.
-
-`socketMiddleware.js` opens a `socket.io-client` connection and bridges it into Redux: incoming `message` events dispatch `SOCKET_MESSAGE_RECEIVED` (merged into state by the reducer), and actions of type `SEND_WEBSOCKET_MESSAGE` are intercepted and emitted over the socket instead of being passed down the middleware chain.
 
 ### Testing conventions
 
