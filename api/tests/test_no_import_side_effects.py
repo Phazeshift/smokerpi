@@ -69,9 +69,14 @@ class TestRunserverMain:
             def cleanup(self):
                 events['cleanup'] = True
 
+        class FakeDisplay:
+            def cleanup(self):
+                events['display cleanup'] = True
+
         class FakeApp:
             debug = True
             smoker = FakeSmoker()
+            display = FakeDisplay()
 
             def run(self, **kwargs):
                 events['run'] = kwargs
@@ -91,6 +96,8 @@ class TestRunserverMain:
         assert set(started['handlers']) == {signal.SIGTERM, signal.SIGINT}
         for number in (signal.SIGTERM, signal.SIGINT):
             started.pop('cleanup', None)
+            started.pop('display cleanup', None)
             started['handlers'][number](number, None)
             assert started['cleanup'] is True
+            assert started['display cleanup'] is True
         assert started['exits'] == [0, 0]

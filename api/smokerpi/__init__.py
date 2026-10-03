@@ -2,6 +2,7 @@ from flask import Flask
 import logging
 from logging.handlers import RotatingFileHandler
 from .config import Config
+from .display import Display, openDevice
 from .auth import registerAuth
 from .routes import registerRoutes
 from .smoker import Smoker
@@ -61,11 +62,14 @@ def create_app(test_config=None):
 
     app.smoker = Smoker(config, configFile, home, test)
     app.worker = Worker(app.smoker)
+    # Off the Pi (emulated hardware) there is no screen to open.
+    app.display = Display(app.smoker, app.worker, None if test else openDevice(config))
     registerAuth(app, app.smoker)
     registerRoutes(app, app.smoker, app.worker)
 
     if test_config is None or test_config.get('start_worker', True):
         app.worker.start()
+        app.display.start()
     if not config.get('password'):
         app.logger.warning('No password set in config.json: anyone on the network can control the smoker')
 

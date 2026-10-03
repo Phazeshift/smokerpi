@@ -27,7 +27,7 @@ The wiring and settings of the smoker's Pi, as reported by the running app (`/ap
 - **Thermocouple:** a MAX31855 read over software (bit-banged) SPI on those three GPIOs, so the Pi's SPI interface does not need enabling. It reports degrees Celsius in 0.25 degree steps.
 - **Blower:** two outputs, wired like a motor driver's two inputs. Pin 1 high with pin 2 low is on, both low is off, and partial speed is 100 Hz PWM on pin 1.
 - **Damper:** a hobby servo driven through [pigpio](https://abyz.me.uk/rpi/pigpio/), so the `pigpiod` daemon must be running (`sudo apt install pigpio && sudo systemctl enable --now pigpiod`; `install.sh` offers to do this). The servo is only pulsed for about a second per move.
-- **I2C (OLED display, ADS1115):** needs the Pi's I2C interface (`sudo raspi-config nonint do_i2c 0`, then reboot; `install.sh` offers to do this). `i2cdetect -y 1` should show the display at `0x3c` and the ADS1115 at `0x48`.
+- **I2C (OLED display, ADS1115):** needs the Pi's I2C interface (`sudo raspi-config nonint do_i2c 0`, then reboot; `install.sh` offers to do this). `i2cdetect -y 1` should show the display at `0x3c` and the ADS1115 at `0x48`. The OLED (128x64, SH1106) shows the temperature, target, AUTO/MANUAL, blower and damper, and any control loop error. If it is not fitted or I2C is off, the app logs a warning and carries on without it.
 
 ### Settings
 
@@ -39,6 +39,7 @@ The wiring and settings of the smoker's Pi, as reported by the running app (`/ap
 | `worker_interval` | 10 | 10 | Seconds between thermocouple reads / PID updates. |
 | `graph_interval` | 10 | 10 | Minimum seconds between graph points (the last 2000 are kept). |
 | `cs_pin`, `clock_pin`, `data_pin`, `blower_pin1`, `blower_pin2`, `damper_pin` | see the table above | same | Pins. |
+| `oled_enabled`, `oled_driver`, `oled_address` | true, `sh1106`, 60 | same | The OLED display (restart to change). `oled_driver` is `sh1106`, `ssd1306` or `ssd1309`; `oled_address` is the I2C address in decimal (60 = 0x3c). |
 
 ### config.json
 
