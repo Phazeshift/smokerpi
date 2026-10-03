@@ -49,11 +49,21 @@ class MAX31855(object):
         The bit-banged read sometimes comes back wrong without raising a fault; one such
         read returned exactly double the real temperature (53.5 for 26.75), so a single read
         is never trusted: this returns a value only once two consecutive reads agree, and raises
-        MAX31855Error if they will not. Faults (open or shorted thermocouple) raise at once.'''
+        MAX31855Error if they will not. Faults (open or shorted thermocouple) raise at once.
+
+        An all-zero word is no data, not 0 degrees: it is what a sensor that is not driving the
+        data line reads as, it has no fault bit set, and two of them agree. It was seen on the
+        Pi for half an hour; with the PID running, a dead sensor would have read as a cold pit.
+        A real reading always has the chip's own junction temperature in D15-D4.'''
         previous = None
+        zeros = 0
         for _ in range(self.MAX_READS):
             self.read()
             self.checkErrors()
+            if self.data == 0:
+                zeros += 1
+                previous = None
+                continue
             if self.data & self.RESERVED_BITS:
                 previous = None    # D17 and D3 are always 0 on a good read
                 continue
@@ -61,6 +71,8 @@ class MAX31855(object):
             if previous is not None and abs(celsius - previous) <= self.AGREEMENT_C:
                 return getattr(self, "to_" + self.units)(celsius)
             previous = celsius
+        if zeros == self.MAX_READS:
+            raise MAX31855Error("No data from the sensor (every bit 0)")
         raise MAX31855Error("Readings do not agree")
 
     def get_rj(self):
