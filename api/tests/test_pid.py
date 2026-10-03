@@ -27,10 +27,26 @@ def run(pid, temperature, steps):
 
 
 class TestWhileSaturated:
-    def test_the_integral_does_not_wind_up_while_the_output_is_saturated(self):
+    def test_the_integral_only_grows_as_far_as_full_output(self):
         pid = make()
         run(pid, 27, 30)                  # 78 degrees under the target for five minutes
-        assert pid.components[1] == 0
+        assert pid.components[1] == pytest.approx(100 - 78)
+
+    def test_from_cold_the_first_pass_reaches_full_output(self):
+        # Seen on the Pi (2026-10-02): from cold the output sat at exactly the proportional
+        # term (78.25 = 105 - 26.75) and the blower, which needs more than 99, never came on.
+        # One 10 s pass of integral (0.1 x 78.25 x 10) overshoots the limit, and the whole
+        # step used to be rolled back, so the integral never grew at all.
+        pid = make(gains=(1, 0.1, 0.05))
+        assert pid(26.75, dt=DT) == 100
+        assert pid.components[1] == pytest.approx(100 - 78.25)
+
+    def test_saturated_with_the_integral_already_past_full_output_it_stays_put(self):
+        pid = make()
+        run(pid, 27, 30)
+        built_up = pid.components[1]
+        run(pid, 20, 5)                   # colder: P alone now needs less integral
+        assert pid.components[1] == pytest.approx(built_up)
 
     def test_the_plain_controller_does_wind_up_which_is_the_bug(self):
         pid = make(PID)
