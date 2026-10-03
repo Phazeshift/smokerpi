@@ -60,6 +60,32 @@ while true; do
 done
 
 while true; do
+    read -p "Would you like to enable I2C? (required for the OLED display and ADS1115) (y/n): " yn
+    case $yn in
+        [Yy]* ) apt-get -y install i2c-tools
+            if command -v raspi-config > /dev/null; then
+                raspi-config nonint do_i2c 0
+            else
+                # Not Raspberry Pi OS: do by hand what raspi-config does.
+                for f in /boot/firmware/config.txt /boot/config.txt; do
+                    if [ -f "$f" ]; then
+                        grep -q '^dtparam=i2c_arm=on' "$f" || echo 'dtparam=i2c_arm=on' >> "$f"
+                        break
+                    fi
+                done
+                grep -q '^i2c-dev' /etc/modules || echo 'i2c-dev' >> /etc/modules
+            fi
+            if [ -n "$SUDO_USER" ]; then
+                usermod -aG i2c "$SUDO_USER"
+            fi
+            echo "I2C is enabled; it takes effect after the reboot."
+            break;;
+        [Nn]* ) break;;
+        * ) echo "Please select (y/n): ";;
+    esac
+done
+
+while true; do
     read -p "Would you like to start SmokerPi automatically after boot? (y/n): " yn
     case $yn in
         [Yy]* ) sed "s@#DIR#@${PWD}@g" smokerpiboot > /etc/init.d/smokerpiboot

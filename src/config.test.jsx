@@ -23,6 +23,9 @@ const FIELD_TABLE = [
   },
   { name: 'damper_minimum', label: 'Damper min', kind: 'whole' },
   { name: 'damper_maximum', label: 'Damper max', kind: 'whole' },
+  { name: 'oled_enabled', label: 'OLED display', kind: null },
+  { name: 'oled_driver', label: 'OLED driver', kind: null, help: 'sh1106, ssd1306 or ssd1309.' },
+  { name: 'oled_address', label: 'OLED I2C address', kind: null },
 ];
 const withFields = config => ({ ...config, fields: FIELD_TABLE.filter(({ name }) => name in config) });
 
@@ -121,6 +124,21 @@ test('shows the pin and interval settings as read-only, and the editable ones as
   ['Target temperature', 'Damper min', 'Damper max']
     .forEach(label => expect(screen.getByLabelText(label)).not.toBeDisabled());
   expect(screen.getByText(/edit config\.json/i)).toBeInTheDocument();
+});
+
+test('shows the OLED settings as read-only, with their values', () => {
+  const state = { ...baseConfig, oled_enabled: true, oled_driver: 'sh1106', oled_address: '0x3c' };
+  fetch.mockResponse(JSON.stringify(withFields(state)));
+  renderWithStore(<Config />);
+
+  return screen.findByLabelText('OLED driver').then(driver => {
+    expect(driver).toBeDisabled();
+    expect(driver).toHaveValue('sh1106');
+    expect(screen.getByLabelText('OLED I2C address')).toBeDisabled();
+    expect(screen.getByLabelText('OLED I2C address')).toHaveValue('0x3c');
+    expect(screen.getByLabelText('OLED display')).toBeDisabled();
+    expect(screen.getByLabelText('OLED display')).toHaveValue('true');
+  });
 });
 
 test.each([
