@@ -39,7 +39,7 @@ The wiring and settings of the smoker's Pi, as reported by the running app (`/ap
 | `worker_interval` | 10 | 10 | Seconds between thermocouple reads / PID updates. |
 | `graph_interval` | 10 | 10 | Minimum seconds between graph points (the last 2000 are kept). |
 | `cs_pin`, `clock_pin`, `data_pin`, `blower_pin1`, `blower_pin2`, `damper_pin` | see the table above | same | Pins. |
-| `oled_enabled`, `oled_driver`, `oled_address` | true, `sh1106`, 60 | same | The OLED display (restart to change). `oled_driver` is `sh1106`, `ssd1306` or `ssd1309`; `oled_address` is the I2C address in decimal (60 = 0x3c). |
+| `oled_enabled`, `oled_driver`, `oled_address` | true, `sh1106`, `"0x3c"` | same | The OLED display (restart to change). `oled_driver` is `sh1106`, `ssd1306` or `ssd1309`; `oled_address` is the I2C address as `i2cdetect` shows it, e.g. `"0x3c"`. They show on the Config page as read-only. |
 
 ### config.json
 

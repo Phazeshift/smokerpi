@@ -45,10 +45,10 @@ FIELDS = (
           help='Tick this if your damper opens at the smaller pulse width (Damper min) instead of '
                'the larger one. Saving moves the damper to match.'),
     Field('history_max_mb', 5),
-    # The OLED display (display.py). Needs a restart, like the pins, and is not shown on the Config page.
-    Field('oled_enabled', True),
-    Field('oled_driver', 'sh1106'),
-    Field('oled_address', 0x3c),
+    # The OLED display (display.py). Read-only like the pins: it is opened once at startup.
+    Field('oled_enabled', True, label='OLED display'),
+    Field('oled_driver', 'sh1106', label='OLED driver', help='sh1106, ssd1306 or ssd1309.'),
+    Field('oled_address', '0x3c', label='OLED I2C address'),
     Field('damper_minimum', 500, 'whole', SERVO_MIN, SERVO_MAX, label='Damper min'),
     Field('damper_maximum', 2500, 'whole', SERVO_MIN, SERVO_MAX, label='Damper max'),
 )

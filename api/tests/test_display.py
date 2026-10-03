@@ -167,6 +167,17 @@ class TestOpenDevice:
             assert openDevice(self.config(oled_driver='nonsense')) is None
         assert 'nonsense' in caplog.text
 
+    @pytest.mark.parametrize('address', ['0x3c', '0X3C', '60', 60])
+    def test_the_address_may_be_hex_or_decimal(self, address, monkeypatch):
+        import smokerpi.display as display
+        assert display.parseAddress(address) == 0x3c
+
+    @pytest.mark.parametrize('address', ['', 'banana', None, '0x', -1, '0x100'])
+    def test_a_bad_address_gives_no_device(self, address, caplog):
+        with caplog.at_level(logging.WARNING, logger='smokerpi'):
+            assert openDevice(self.config(oled_address=address)) is None
+        assert 'oled_address' in caplog.text
+
     def test_a_missing_display_gives_no_device(self, caplog):
         # No I2C bus here (or no luma installed): the app must carry on without a display.
         with caplog.at_level(logging.WARNING, logger='smokerpi'):
@@ -179,13 +190,24 @@ class TestConfig:
         config = Config(test=True).defaultConfig()
         assert config['oled_enabled'] is True
         assert config['oled_driver'] == 'sh1106'
-        assert config['oled_address'] == 0x3c
+        assert config['oled_address'] == '0x3c'
 
-    def test_the_oled_settings_are_not_editable_or_shown(self, client):
-        # They need a restart, like the pins, and have no label, so the Config page never sees them.
+    def test_the_oled_settings_are_shown_but_not_editable(self, client):
+        # They need a restart, like the pins: the Config page lists them as disabled boxes.
         import json
-        fields = [field['name'] for field in json.loads(client.get('/api/config').data)['fields']]
-        assert not [name for name in fields if name.startswith('oled')]
+        fields = {field['name']: field for field in json.loads(client.get('/api/config').data)['fields']}
+        for name in ('oled_enabled', 'oled_driver', 'oled_address'):
+            assert fields[name]['label']
+            assert fields[name]['kind'] is None
+
+    def test_posting_does_not_change_them(self, client):
+        import json
+        current = json.loads(client.get('/api/config').data)
+        current.pop('fields')
+        current.update(oled_enabled=False, oled_driver='ssd1306', oled_address='0x3d')
+        client.post('/api/config', json=current)
+        after = json.loads(client.get('/api/config').data)
+        assert (after['oled_enabled'], after['oled_driver'], after['oled_address']) == (True, 'sh1106', '0x3c')
 
 
 class TestApp:

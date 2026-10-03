@@ -71,6 +71,15 @@ def render(state, error, size):
     return image
 
 
+def parseAddress(value):
+    """An I2C address from config.json: '0x3c' (as i2cdetect shows it) or a plain number.
+    Raises ValueError if it is not a valid 7-bit address."""
+    address = int(value, 0) if isinstance(value, str) else int(value)
+    if not 0 <= address <= 0x7f:
+        raise ValueError(value)
+    return address
+
+
 def openDevice(config):
     """The luma device for the screen in config.json, or None if it is switched off, unknown, or
     cannot be opened (luma not installed, I2C off, nothing fitted)."""
@@ -81,9 +90,14 @@ def openDevice(config):
         log.warning('Unknown oled_driver %r (use one of %s); the display is off', driver, ', '.join(DRIVERS))
         return None
     try:
+        address = parseAddress(config.get('oled_address', '0x3c'))
+    except (TypeError, ValueError):
+        log.warning('Invalid oled_address %r (use e.g. "0x3c"); the display is off', config.get('oled_address'))
+        return None
+    try:
         from luma.core.interface.serial import i2c
         from luma.oled import device
-        return getattr(device, driver)(i2c(port=1, address=int(config.get('oled_address', 0x3c))))
+        return getattr(device, driver)(i2c(port=1, address=address))
     except Exception as e:
         log.warning('OLED display not available (%r); carrying on without it', e)
         return None
